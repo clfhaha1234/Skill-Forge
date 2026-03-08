@@ -1,0 +1,23 @@
+{
+  "name": "skill-forge",
+  "version": "1.0.0",
+  "description": "## One Sentence",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/clfhaha1234/Skill-Forge.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/clfhaha1234/Skill-Forge/issues"
+  },
+  "homepage": "https://github.com/clfhaha1234/Skill-Forge#readme",
+  "dependencies": {
+    "pptxgenjs": "^4.0.1"
+  }
+}
