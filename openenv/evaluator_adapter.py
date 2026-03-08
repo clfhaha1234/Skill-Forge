@@ -36,10 +36,9 @@ from google.genai import types
 EVALUATION_SYSTEM_PROMPT = """You are an expert McKinsey & Company slide design evaluator.
 
 You will be shown:
-1. REFERENCE IMAGES: 5 pages from a real McKinsey & Company consulting deck (Chilean Hydrogen Pathway, December 2020). These represent the gold standard for visual style.
-2. CANDIDATE SLIDE: A programmatically generated PowerPoint slide about Dutch Hydrogen Strategy, rendered as a JPEG image.
+1. CANDIDATE SLIDE: A programmatically generated PowerPoint slide, rendered as a JPEG image.
 
-Your job: Score how closely the CANDIDATE SLIDE matches the McKinsey visual style shown in the REFERENCE IMAGES.
+Your job: Score how closely the CANDIDATE SLIDE matches McKinsey visual style based on the rubric below.
 
 ## Scoring Rubric (100 points total)
 
@@ -160,20 +159,22 @@ class EvaluatorAdapter:
     def __init__(self, reference_dir: Path) -> None:
         """
         Args:
-            reference_dir: Directory containing ref-01.jpg through ref-05.jpg.
+            reference_dir: Directory that may contain ref-01.jpg through ref-05.jpg.
+                           If the directory is missing or images are absent, evaluation
+                           proceeds using rubric-only scoring (no reference comparison).
         """
         self.reference_dir = reference_dir
         self._client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 
-        # Validate reference images exist at construction time.
-        missing = [
-            f
-            for f in self.REFERENCE_FILENAMES
-            if not (reference_dir / f).exists()
+        # Check which reference images are available (missing ones are silently skipped).
+        self._available_refs = [
+            f for f in self.REFERENCE_FILENAMES
+            if reference_dir.exists() and (reference_dir / f).exists()
         ]
-        if missing:
-            raise FileNotFoundError(
-                f"Missing reference images in {reference_dir}: {missing}"
+        if not self._available_refs:
+            logger.warning(
+                "No reference images found in %s — evaluating without visual references.",
+                reference_dir,
             )
 
     def evaluate(self, slide_jpg_path: Path) -> dict:
@@ -203,15 +204,16 @@ class EvaluatorAdapter:
         # Gemini accepts text strings and Part objects interleaved.
         contents: list[types.Part | str] = []
 
-        # Reference images first.
-        contents.append(
-            "## REFERENCE IMAGES (Real McKinsey deck)\n"
-            "The following 5 images are from a real McKinsey & Company consulting "
-            "report. Study their visual style carefully."
-        )
-        for i, fname in enumerate(self.REFERENCE_FILENAMES, 1):
-            contents.append(_image_part(self.reference_dir / fname))
-            contents.append(f"(Reference page {i})")
+        # Include reference images if available.
+        if self._available_refs:
+            contents.append(
+                "## REFERENCE IMAGES (Real McKinsey deck)\n"
+                "The following images are from a real McKinsey & Company consulting "
+                "report. Study their visual style carefully."
+            )
+            for i, fname in enumerate(self._available_refs, 1):
+                contents.append(_image_part(self.reference_dir / fname))
+                contents.append(f"(Reference page {i})")
 
         # Candidate slide.
         contents.append(

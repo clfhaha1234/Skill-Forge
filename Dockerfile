@@ -1,16 +1,17 @@
-# Slide Skill OpenEnv — Docker image
+# Slide Skill OpenEnv — HuggingFace Spaces Docker image
+#
+# HF Spaces requirements:
+#   - app_port: 7860  (set in README.md YAML header)
+#   - Non-root user with UID 1000
+#   - SLIDE_SKILL_SESSION_ROOT=/tmp (Spaces app dir is read-only)
 #
 # Layer sizes (approximate):
 #   python:3.12-slim base:     ~130 MB
 #   Node.js 20 + pptxgenjs:   ~200 MB
-#   LibreOffice:               ~500 MB  <-- dominant cost; unavoidable for .pptx → .pdf
+#   LibreOffice:               ~500 MB
 #   poppler-utils (pdftoppm):  ~30 MB
 #   Python deps:               ~80 MB
 # Total compressed: ~600-700 MB
-#
-# LibreOffice is the unavoidable bottleneck. It is required to convert
-# .pptx → .pdf. There is no lighter alternative that handles pptxgenjs
-# output faithfully.
 
 FROM python:3.12-slim
 
@@ -18,11 +19,8 @@ LABEL description="Slide Skill OpenEnv — McKinsey PPT generation environment"
 
 # System dependencies — installed in one RUN to minimize layers.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    # LibreOffice for .pptx → .pdf conversion
     libreoffice \
-    # poppler-utils provides pdftoppm (.pdf → .jpg)
     poppler-utils \
-    # Node.js 20 LTS via NodeSource
     curl \
     ca-certificates \
     gnupg \
@@ -34,13 +32,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Verify all required tools are available at build time.
 RUN node --version && npm --version && soffice --version && pdftoppm -v 2>&1 | head -1
 
+# HuggingFace Spaces requires a non-root user with UID 1000.
+RUN useradd -m -u 1000 appuser
+
 WORKDIR /app
 
-# Install pptxgenjs (Node.js dependency) — copy package.json first for layer caching.
+# Install pptxgenjs (Node.js dependency).
 COPY package.json package-lock.json* ./
 RUN npm install --production
 
-# Install Python dependencies — copy pyproject.toml first for layer caching.
+# Install Python dependencies.
 COPY pyproject.toml ./
 RUN pip install --no-cache-dir -e ".[server]"
 
@@ -49,8 +50,8 @@ COPY pptx/ ./pptx/
 COPY skill_files_baseline/ ./skill_files_baseline/
 COPY openenv/ ./openenv/
 
-# Embed the task prompt directly (reference images not included —
-# evaluator uses rubric-only scoring when they are absent).
+# Embed the fixed task prompt directly (output/reference/ images are not
+# included — the evaluator runs without them using rubric-only scoring).
 RUN mkdir -p /app/output/reference && \
     printf '%s\n' \
       '# Task Prompt' \
@@ -67,20 +68,23 @@ RUN mkdir -p /app/output/reference && \
       'Use the rubric in your evaluation to score against McKinsey visual standards.' \
     > /app/output/TASK_PROMPT.md
 
+# Give the non-root user ownership of the app directory.
+RUN chown -R appuser:appuser /app
+
+USER appuser
+
 WORKDIR /app/openenv
 
-# LibreOffice needs a writable user profile directory.
-# Setting HOME=/tmp gives each process its own profile path and avoids
-# concurrent session conflicts with the LibreOffice lock files.
+# LibreOffice needs a writable HOME for its user profile.
 ENV HOME=/tmp
-# Use the headless VCL plugin (no display required).
 ENV SAL_USE_VCLPLUGIN=svp
 
-EXPOSE 8000
+# Sessions are written to /tmp (writable on HF Spaces).
+ENV SLIDE_SKILL_SESSION_ROOT=/tmp
+
+EXPOSE 7860
 
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:7860/health')"
 
-# Single worker — LibreOffice subprocess calls must be serialized within one
-# OS process. Concurrent sessions are handled by per-session /tmp/ directories.
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "7860", "--workers", "1"]
