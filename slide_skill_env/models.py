@@ -25,6 +25,10 @@ class SkillObservation(Observation):
     strengths: list[str] = Field(default_factory=list)
     weaknesses: list[str] = Field(default_factory=list)
     one_line_verdict: str = Field(default="")
+    patronus_gate: dict = Field(
+        default_factory=dict,
+        description="Patronus pass/fail gate: {pass: bool, failed_criteria: [...]}",
+    )
     skill_files: dict[str, str] = Field(
         description="Current skill folder contents: filename -> content"
     )

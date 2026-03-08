@@ -12,6 +12,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from openenv.core.env_server.interfaces import Environment
+
 from slide_skill_env.converter import pptx_to_jpg
 from slide_skill_env.evaluator import evaluate_slide
 from slide_skill_env.generator import generate_slide
@@ -20,12 +22,13 @@ from slide_skill_env.optimizer import optimize_skill
 from slide_skill_env.skill_manager import SkillManager
 
 
-class SlideSkillEnvironment:
+class SlideSkillEnvironment(Environment[SkillAction, SkillObservation, SkillState]):
     """OpenEnv environment for self-improving PPT skill optimization."""
 
     SUPPORTS_CONCURRENT_SESSIONS = False
 
     def __init__(self):
+        super().__init__()
         self._state = SkillState()
         self._episode_dir: Path | None = None
         self._skill_manager: SkillManager | None = None
@@ -118,6 +121,7 @@ class SlideSkillEnvironment:
             strengths=evaluation.get("strengths", []),
             weaknesses=evaluation.get("weaknesses", []),
             one_line_verdict=evaluation.get("one_line_verdict", ""),
+            patronus_gate=evaluation.get("patronus_gate", {}),
             skill_files=skill_files,
             slide_image_base64=base64.b64encode(slide_bytes).decode(),
             done=False,
@@ -178,6 +182,7 @@ class SlideSkillEnvironment:
             strengths=evaluation.get("strengths", []),
             weaknesses=evaluation.get("weaknesses", []),
             one_line_verdict=evaluation.get("one_line_verdict", ""),
+            patronus_gate=evaluation.get("patronus_gate", {}),
             skill_files=skill_files,
             slide_image_base64=base64.b64encode(slide_bytes).decode(),
             done=done,

@@ -1,12 +1,30 @@
-"""Reference client for the Slide Skill environment."""
+"""Reference client for the Slide Skill environment.
+
+Uses WebSocket (/ws) for stateful sessions — the OpenEnv HTTP endpoints
+(/reset, /step) are stateless and create a new environment per request.
+"""
 
 import argparse
 import asyncio
 import base64
+import json
 import sys
 from pathlib import Path
 
-import httpx
+import websockets
+
+
+def _extract_obs(resp: dict) -> dict:
+    """Extract observation from OpenEnv WS response.
+
+    Response format: {"type": "observation", "data": {"observation": {...}, "reward": ..., "done": ...}}
+    """
+    data = resp["data"]
+    obs = data.get("observation", data)
+    # Merge top-level done/reward into obs for convenience
+    if "done" in data and "done" not in obs:
+        obs["done"] = data["done"]
+    return obs
 
 
 async def run_episode(
@@ -16,7 +34,7 @@ async def run_episode(
     max_steps: int = 7,
     smoke_test: bool = False,
 ):
-    """Run one optimization episode against the server."""
+    """Run one optimization episode against the server via WebSocket."""
     # Load reference images
     ref_images = []
     for img_path in sorted(reference_dir.glob("*.jpg")):
@@ -26,30 +44,40 @@ async def run_episode(
         sys.exit(1)
     print(f"Loaded {len(ref_images)} reference images from {reference_dir}")
 
-    async with httpx.AsyncClient(timeout=300.0) as client:
+    # Convert http(s) URL to ws(s) URL
+    ws_url = server_url.replace("http://", "ws://").replace("https://", "wss://")
+    ws_url = ws_url.rstrip("/") + "/ws"
+
+    async with websockets.connect(ws_url, max_size=50 * 1024 * 1024) as ws:
         # Reset
         print("\n--- Reset ---")
-        reset_resp = await client.post(
-            f"{server_url}/reset",
-            json={
+        await ws.send(json.dumps({
+            "type": "reset",
+            "data": {
                 "reference_images": ref_images,
                 "task_prompt": task_prompt,
                 "max_steps": 1 if smoke_test else max_steps,
             },
-        )
-        reset_resp.raise_for_status()
-        obs = reset_resp.json()["observation"]
+        }))
+        resp = json.loads(await ws.recv())
+        if resp.get("type") == "error":
+            print(f"ERROR: {resp.get('message')}")
+            return
+        obs = _extract_obs(resp)
         print(f"Baseline score: {obs['total']}/100")
         print(f"Verdict: {obs.get('one_line_verdict', '')}")
 
         if smoke_test:
             print("\n--- Smoke Test: 1 step ---")
-            step_resp = await client.post(
-                f"{server_url}/step",
-                json={"action": {"hint": None}},
-            )
-            step_resp.raise_for_status()
-            obs = step_resp.json()["observation"]
+            await ws.send(json.dumps({
+                "type": "step",
+                "data": {"hint": None},
+            }))
+            resp = json.loads(await ws.recv())
+            if resp.get("type") == "error":
+                print(f"ERROR: {resp.get('message')}")
+                return
+            obs = _extract_obs(resp)
             print(f"Step 1 score: {obs['total']}/100")
             print(f"Verdict: {obs.get('one_line_verdict', '')}")
             print(f"Done: {obs.get('done_reason')}")
@@ -60,12 +88,15 @@ async def run_episode(
         while not obs.get("done", False):
             step += 1
             print(f"\n--- Step {step} ---")
-            step_resp = await client.post(
-                f"{server_url}/step",
-                json={"action": {"hint": None}},
-            )
-            step_resp.raise_for_status()
-            obs = step_resp.json()["observation"]
+            await ws.send(json.dumps({
+                "type": "step",
+                "data": {"hint": None},
+            }))
+            resp = json.loads(await ws.recv())
+            if resp.get("type") == "error":
+                print(f"ERROR: {resp.get('message')}")
+                break
+            obs = _extract_obs(resp)
             print(f"Score: {obs['total']}/100")
             print(f"Verdict: {obs.get('one_line_verdict', '')}")
             if obs.get("weaknesses"):
@@ -80,7 +111,7 @@ async def run_episode(
 def main():
     parser = argparse.ArgumentParser(description="Slide Skill OpenEnv Client")
     parser.add_argument(
-        "--server", default="http://localhost:8000", help="Server URL"
+        "--server", default="http://127.0.0.1:8000", help="Server URL"
     )
     parser.add_argument(
         "--references",

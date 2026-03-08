@@ -53,34 +53,39 @@ def generate_slide(
         tools=[{"type": "code_execution_20250825", "name": "code_execution"}],
     )
 
-    # Extract file_id from response
-    file_id = _extract_file_id(response)
-    if not file_id:
+    # Extract file_ids from response
+    file_ids = _extract_file_ids(response)
+    if not file_ids:
         raise RuntimeError(
             "No file was generated. Response: "
             + str([b.type for b in response.content])
         )
 
-    # Download the file
-    file_content = client.beta.files.download(
-        file_id=file_id, betas=["files-api-2025-04-14"]
-    )
+    # Download files — find the .pptx (PK zip header)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(output_path, "wb") as f:
-        file_content.write_to_file(f.name)
+    for file_id in file_ids:
+        file_resp = client.beta.files.download(
+            file_id=file_id, betas=["files-api-2025-04-14"]
+        )
+        data = file_resp.read()
+        # PK\x03\x04 is the ZIP/PPTX magic header
+        if data[:4] == b"PK\x03\x04":
+            output_path.write_bytes(data)
+            return output_path
 
-    return output_path
+    raise RuntimeError(
+        f"Generated {len(file_ids)} files but none were .pptx (ZIP) format"
+    )
 
 
-def _extract_file_id(response) -> str | None:
-    """Extract file_id from a code execution response."""
+def _extract_file_ids(response) -> list[str]:
+    """Extract all file_ids from code execution response blocks."""
+    file_ids = []
     for block in response.content:
-        if block.type == "tool_result":
-            for item in block.content:
-                if hasattr(item, "file_id"):
-                    return item.file_id
-        if block.type == "server_tool_result":
-            for item in getattr(block, "content", []):
-                if hasattr(item, "file_id"):
-                    return item.file_id
-    return None
+        if block.type == "bash_code_execution_tool_result":
+            result = block.content
+            if hasattr(result, "content") and isinstance(result.content, list):
+                for item in result.content:
+                    if hasattr(item, "file_id"):
+                        file_ids.append(item.file_id)
+    return file_ids
