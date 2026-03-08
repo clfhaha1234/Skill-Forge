@@ -26,18 +26,17 @@ import textwrap
 from pathlib import Path
 from typing import Any
 
+import anthropic
+import httpx
 from dotenv import load_dotenv
-from google import genai
+from loguru import logger
 
 load_dotenv(Path(__file__).parent.parent / ".env")
-from google.genai import types
-import httpx
-from loguru import logger
 
 from models import SlideSkillObservation
 
 SERVER_URL = "http://localhost:8000"
-OPTIMIZER_MODEL = "gemini-3.1-pro-preview"
+OPTIMIZER_MODEL = "claude-opus-4-6"
 
 BASELINE_EXAMPLES_CONTENT = "(Empty — no prior optimization rounds)\n"
 
@@ -64,7 +63,7 @@ class SlideSkillClient:
 
         Args:
             session_id: Active session ID.
-            action: Dict matching EditSectionAction or ReplaceFileAction schema.
+            action: Dict matching any SlideSkillAction schema.
                     Must include "action_type" key.
         """
         payload = {"session_id": session_id, "action": action}
@@ -94,15 +93,13 @@ class SlideSkillClient:
 
 def call_optimizer_llm(
     obs: SlideSkillObservation,
-    gemini_client: genai.Client,
+    anthropic_client: anthropic.Anthropic,
 ) -> dict[str, Any]:
     """
-    Call the optimizer LLM to generate a new DESIGN_RULES.md based on
+    Call Claude Opus 4.6 to generate a new DESIGN_RULES.md based on
     the evaluation feedback.
 
     Returns a dict suitable for the step() action parameter.
-    Uses ReplaceFileAction since the historical optimizer rewrites
-    the file wholesale.
     """
     prompt = textwrap.dedent(f"""\
         You are a McKinsey slide design optimizer. You are improving a
@@ -141,13 +138,13 @@ def call_optimizer_llm(
         no code fences.
     """)
 
-    response = gemini_client.models.generate_content(
+    response = anthropic_client.messages.create(
         model=OPTIMIZER_MODEL,
-        contents=prompt,
-        config=types.GenerateContentConfig(max_output_tokens=4096),
+        max_tokens=4096,
+        messages=[{"role": "user", "content": prompt}],
     )
 
-    new_content = response.text.strip()
+    new_content = response.content[0].text.strip()
 
     return {
         "action_type": "replace_file",
@@ -163,7 +160,7 @@ def run_optimization_loop(server_url: str = SERVER_URL, max_steps: int = 7) -> N
     This mirrors the historical Skill Forge loop but driven through the
     OpenEnv HTTP interface.
     """
-    gemini_client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+    anthropic_client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
     with SlideSkillClient(base_url=server_url) as client:
         logger.info(f"Starting optimization loop (max {max_steps} steps) | server={server_url}")
@@ -171,9 +168,9 @@ def run_optimization_loop(server_url: str = SERVER_URL, max_steps: int = 7) -> N
         logger.info(f"Session: {session_id}")
 
         # Step 0: baseline — generate slide with unmodified skill files.
-        logger.info("Step 0/baseline | generating slide (Flash)...")
+        logger.info("Step 0/baseline | generating slide (Sonnet 4.6)...")
         logger.info("Step 0/baseline | running Node.js + LibreOffice → JPG...")
-        logger.info("Step 0/baseline | evaluating slide (Pro)...")
+        logger.info("Step 0/baseline | evaluating slide (Gemini 3.1 Pro)...")
         obs = client.step(
             session_id,
             {
@@ -189,11 +186,11 @@ def run_optimization_loop(server_url: str = SERVER_URL, max_steps: int = 7) -> N
                 logger.info("Episode complete (max_steps reached).")
                 break
 
-            logger.info(f"Step {step_idx}/{max_steps} | optimizing skill files (Pro)...")
-            action = call_optimizer_llm(obs, gemini_client)
-            logger.info(f"Step {step_idx}/{max_steps} | generating slide (Flash)...")
+            logger.info(f"Step {step_idx}/{max_steps} | optimizing skill files (Opus 4.6)...")
+            action = call_optimizer_llm(obs, anthropic_client)
+            logger.info(f"Step {step_idx}/{max_steps} | generating slide (Sonnet 4.6)...")
             logger.info(f"Step {step_idx}/{max_steps} | running Node.js + LibreOffice → JPG...")
-            logger.info(f"Step {step_idx}/{max_steps} | evaluating slide (Pro)...")
+            logger.info(f"Step {step_idx}/{max_steps} | evaluating slide (Gemini 3.1 Pro)...")
             obs = client.step(session_id, action)
 
             delta_str = f"{obs.reward * 100:+.0f} pts"

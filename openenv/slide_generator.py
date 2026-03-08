@@ -2,7 +2,7 @@
 Slide Generator — orchestrates the full PPT generation pipeline.
 
 Pipeline (in order):
-    1. LLM reads skill files + TASK_PROMPT.md + js_templates + constraints
+    1. Claude Sonnet 4.6 reads skill files + TASK_PROMPT.md + js_templates + constraints
        → writes pptxgenjs JavaScript to generate.js in the session output dir.
     2. Code patches are applied to the generated JS.
     3. `node generate.js` runs in the session output dir → produces slide.pptx.
@@ -29,8 +29,7 @@ import subprocess
 import textwrap
 from pathlib import Path
 
-from google import genai
-from google.genai import types
+import anthropic
 
 from models import SlideSkillState
 
@@ -50,8 +49,8 @@ PDFTOPPM = (
     or "pdftoppm"
 )
 
-# Gemini Flash: fast and cost-effective for code generation.
-GENERATOR_MODEL = "gemini-3-flash-preview"
+# Claude Sonnet 4.6: fast and cost-effective for code generation.
+GENERATOR_MODEL = "claude-sonnet-4-6"
 GENERATOR_MAX_TOKENS = 4096
 
 
@@ -67,7 +66,7 @@ class SlideGenerator:
         self.task_prompt = task_prompt_path.read_text(encoding="utf-8")
         self.pptx_skill_dir = pptx_skill_dir
         self.reference_dir = reference_dir
-        self._client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+        self._client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
     def generate(
         self,
@@ -180,7 +179,7 @@ class SlideGenerator:
         node_error: str | None = None,
     ) -> str:
         """
-        Call the generator LLM with skill files + task prompt as context.
+        Call Claude Sonnet 4.6 with skill files + task prompt as context.
 
         Reads skill files from the session directory first (so agent edits
         take effect), falling back to the repo's pptx/ dir for any files
@@ -191,8 +190,6 @@ class SlideGenerator:
         design_rules = (session_dir / "DESIGN_RULES.md").read_text(encoding="utf-8")
         examples = (session_dir / "EXAMPLES.md").read_text(encoding="utf-8")
 
-        # Load pptx tooling from session dir (edited copies) with fallback
-        # to repo originals.
         pptx_skill = self._read_pptx_skill(session_dir)
 
         system_prompt = textwrap.dedent("""\
@@ -221,7 +218,6 @@ class SlideGenerator:
             {self.task_prompt}
         """)
 
-        # Inject hard constraints if any.
         if state and state.constraints:
             constraints_text = "\n".join(f"- {c}" for c in state.constraints)
             user_message += textwrap.dedent(f"""
@@ -230,7 +226,6 @@ class SlideGenerator:
             {constraints_text}
             """)
 
-        # Inject JS templates if any.
         if state and state.js_templates:
             templates_text = ""
             for name, code in state.js_templates.items():
@@ -254,27 +249,22 @@ class SlideGenerator:
             {node_error}
         """)
 
-        response = self._client.models.generate_content(
+        response = self._client.messages.create(
             model=GENERATOR_MODEL,
-            contents=user_message,
-            config=types.GenerateContentConfig(
-                system_instruction=system_prompt,
-                max_output_tokens=GENERATOR_MAX_TOKENS,
-            ),
+            max_tokens=GENERATOR_MAX_TOKENS,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_message}],
         )
 
-        code = response.text.strip()
+        code = response.content[0].text.strip()
 
-        # Extract from markdown code fence if present (LLMs often add them
-        # despite instructions). Handles ```javascript, ```js, or plain ```.
+        # Extract from markdown code fence if present.
         fence_match = re.search(r"```(?:javascript|js)?\n(.*?)```", code, re.DOTALL)
         if fence_match:
             code = fence_match.group(1).strip()
 
         # Rewrite all bare require('pkg') calls to absolute paths so the
-        # script works when run from any /tmp/ directory.  We only rewrite
-        # packages that actually exist in node_modules; unknown packages are
-        # left untouched (they'd fail at runtime but at least not silently).
+        # script works when run from any tmp directory.
         node_modules = REPO_ROOT / "node_modules"
 
         def _rewrite_require(m: re.Match) -> str:
@@ -283,12 +273,11 @@ class SlideGenerator:
             pkg_path = node_modules / pkg
             if pkg_path.exists():
                 return f"require({quote}{pkg_path}{quote})"
-            return m.group(0)  # leave unknown packages as-is
+            return m.group(0)
 
         code = re.sub(r"require\((['\"])([^./][^'\"]*)\1\)", _rewrite_require, code)
 
-        # LLMs sometimes emit the require line twice. Keep only the first
-        # declaration to avoid "Identifier already declared" SyntaxError.
+        # Deduplicate require lines to avoid "Identifier already declared".
         seen: set[str] = set()
         deduped = []
         for line in code.splitlines():
@@ -335,7 +324,7 @@ class SlideGenerator:
             cwd=cwd,
             capture_output=True,
             text=True,
-            timeout=300,  # 5 min hard limit per stage
+            timeout=300,
         )
         if result.returncode != 0:
             raise RuntimeError(
