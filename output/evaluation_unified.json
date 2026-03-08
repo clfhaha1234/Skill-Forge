@@ -1,0 +1,81 @@
+{
+  "v7": {
+    "patronus_gate": {
+      "pass": false,
+      "criteria_results": [
+        {
+          "criterion": "White background",
+          "index": 1,
+          "met": true
+        },
+        {
+          "criterion": "Restrained color palette",
+          "index": 2,
+          "met": false
+        },
+        {
+          "criterion": "Insight-driven title",
+          "index": 3,
+          "met": true
+        },
+        {
+          "criterion": "Structured data table",
+          "index": 4,
+          "met": true
+        },
+        {
+          "criterion": "Proper McKinsey footer",
+          "index": 5,
+          "met": true
+        },
+        {
+          "criterion": "Clean typography hierarchy",
+          "index": 6,
+          "met": true
+        },
+        {
+          "criterion": "Thin divider line",
+          "index": 7,
+          "met": true
+        },
+        {
+          "criterion": "Professional polish",
+          "index": 8,
+          "met": false
+        }
+      ],
+      "failed_criteria": [
+        "Restrained color palette",
+        "Professional polish"
+      ]
+    },
+    "gemini_score": {
+      "scores": {
+        "background_layout": 14,
+        "color_palette": 9,
+        "typography": 14,
+        "title_quality": 15,
+        "data_presentation": 11,
+        "structural_elements": 15,
+        "overall_impression": 8
+      },
+      "total": 86,
+      "strengths": [
+        "Excellent insight-driven title that perfectly mimics the reference deck's numbering and 'so-what' style.",
+        "Flawless execution of structural elements, including the title divider line, source formatting, and footer.",
+        "Correct typography pairing (serif for the main title, sans-serif for body text)."
+      ],
+      "weaknesses": [
+        "The pastel color palette (pink, light blue, light green) used for the table columns is uncharacteristic of McKinsey's standard restrained blue/grey style.",
+        "Full-column background shading is a bit heavy; McKinsey typically uses subtle row shading or white backgrounds with clean divider lines."
+      ],
+      "one_line_verdict": "A highly professional slide with perfect structural replication, slightly let down by an overly colorful, non-standard pastel table palette."
+    },
+    "final_status": "FAIL",
+    "final_score": 86,
+    "action_items": [
+      "Fix: Restrained color palette",
+      "Fix: Professional polish"
+    ]
+  }
+}

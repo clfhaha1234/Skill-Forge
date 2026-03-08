@@ -1,13 +1,12 @@
-# Fixed Task Prompt (same for ALL versions)
+# Task Prompt
 
-Generate a 1-slide timeline PowerPoint about Dutch Hydrogen Strategy (2020-2035) in McKinsey & Company consulting style.
+Generate a 1-slide PowerPoint comparing three hydrogen production methods (Grey, Blue, Green) in McKinsey & Company consulting style.
 
-The slide should cover these milestones:
-- 2020: National Hydrogen Strategy published
-- 2022: REPowerEU plan accelerates ambitions
-- 2025: First green H2 hubs operational
-- 2028: HyNetwork backbone pipeline live
-- 2030: Scale-up phase complete
-- 2035: EU hydrogen corridor integration
+The slide should include:
+- An insight-driven title (a "so-what" conclusion, not a topic label)
+- A structured comparison table with columns for Grey H2, Blue H2, and Green H2
+- Row categories: Production process, CO2 emissions (kg CO2/kgH2), Investment scale, EPC duration, Link to power sector
+- Footnotes with source citations
+- A "McKinsey & Company" footer with page number
 
-Use the reference document (estudio_base_para_la_elaboracion_de_la_estrategia_nacional_para_el_desarrollo_de_hidrogeno_verde_en_chile.pdf) as the visual style benchmark.
+Use the reference images in the reference/ folder as the visual style benchmark.

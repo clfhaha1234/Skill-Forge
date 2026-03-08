@@ -1,226 +1,145 @@
 const pptxgen = require("pptxgenjs");
-
 const pres = new pptxgen();
-pres.layout = "LAYOUT_WIDE"; // 13.33" x 7.5"
-pres.author = "McKinsey & Company";
-pres.title = "Dutch Hydrogen Strategy 2020-2035";
+
+pres.layout = "LAYOUT_16x9";
+pres.author = "Skill-Forge";
+pres.title = "H2 Demand and Production Costs";
 
 const slide = pres.addSlide();
 slide.background = { color: "FFFFFF" };
 
-// === COLORS ===
-const NAVY = "0C2340";
-const CRIMSON = "C00000";
-const DARK_GREY = "404040";
-const LIGHT_GREY = "E8E8E8";
-const MED_GREY = "999999";
-
-// === TITLE ===
+// === Title ===
 slide.addText(
-  "The Netherlands aims to become Europe's green hydrogen hub, scaling from 500 MW to 3\u20134 GW by 2030",
+  "1.1/ Blue H2 is cheaper today, but Green H2 is the 'new solar' with costs decreasing rapidly",
   {
-    x: 0.5, y: 0.35, w: 12.33, h: 0.85,
-    fontFace: "Georgia", fontSize: 22, bold: true, color: "000000",
-    valign: "top", margin: 0
+    x: 0.5, y: 0.2, w: 9, h: 0.65,
+    fontSize: 16, fontFace: "Georgia", bold: true,
+    color: "000000", margin: 0, lineSpacingMultiple: 1.15
   }
 );
 
-// === SUBTITLE ===
-slide.addText("Dutch Hydrogen Strategy: Key milestones and targets (2020\u20132035)", {
-  x: 0.5, y: 1.25, w: 12.33, h: 0.25,
-  fontFace: "Calibri", fontSize: 10, color: "888888",
-  valign: "top", margin: 0
+// === Subtitle ===
+slide.addText("Global H2 demand and production costs\u00B9", {
+  x: 0.5, y: 0.88, w: 5, h: 0.18,
+  fontSize: 9, fontFace: "Calibri", color: "666666", margin: 0
 });
 
-// === CRIMSON DIVIDER ===
+// === Divider line ===
 slide.addShape(pres.shapes.LINE, {
-  x: 0.5, y: 1.55, w: 12.33, h: 0,
-  line: { color: CRIMSON, width: 0.75 }
+  x: 0.5, y: 1.1, w: 9, h: 0,
+  line: { color: "333333", width: 1 }
 });
 
-// === TIMELINE ===
-const timelineY = 2.8;
-const timelineStartX = 0.9;
-const timelineEndX = 12.43;
+// === Legend ===
+slide.addShape(pres.shapes.RECTANGLE, {
+  x: 6.8, y: 1.15, w: 0.15, h: 0.15,
+  fill: { color: "000000" }
+});
+slide.addText("Least-cost option", {
+  x: 7.0, y: 1.15, w: 1.2, h: 0.15,
+  fontSize: 7, fontFace: "Calibri", color: "333333", margin: 0
+});
+slide.addShape(pres.shapes.RECTANGLE, {
+  x: 8.3, y: 1.15, w: 0.15, h: 0.15,
+  fill: { color: "FFFFFF" }, line: { color: "000000", width: 0.5 }
+});
+slide.addText("2nd least-cost option", {
+  x: 8.5, y: 1.15, w: 1.2, h: 0.15,
+  fontSize: 7, fontFace: "Calibri", color: "333333", margin: 0
+});
 
-// Timeline connector line (2pt navy)
+// === Navy header border ===
 slide.addShape(pres.shapes.LINE, {
-  x: timelineStartX, y: timelineY, w: timelineEndX - timelineStartX, h: 0,
-  line: { color: NAVY, width: 2 }
+  x: 0.5, y: 1.45, w: 9, h: 0,
+  line: { color: "1B3A5C", width: 2 }
 });
 
-// Milestones
-const milestones = [
-  { year: "2020", label: "National Hydrogen\nStrategy published", above: true },
-  { year: "2022", label: "REPowerEU plan\naccelerates ambitions", above: false },
-  { year: "2025", label: "First green H2\nhubs operational", above: true },
-  { year: "2028", label: "HyNetwork backbone\npipeline live", above: false },
-  { year: "2030", label: "Scale-up phase\ncomplete", above: true },
-  { year: "2035", label: "EU hydrogen corridor\nintegration", above: false }
-];
+// === Table ===
+const hdr = (t) => ({ text: t, options: { bold: true, color: "000000", fill: { color: "FFFFFF" }, fontSize: 9, fontFace: "Calibri", align: "center", valign: "middle" } });
+const lbl = (t) => ({ text: t, options: { bold: true, color: "000000", fill: { color: "FFFFFF" }, fontSize: 10, fontFace: "Calibri", valign: "middle" } });
+const cell = (t) => ({ text: t, options: { color: "333333", fill: { color: "FFFFFF" }, fontSize: 9, fontFace: "Calibri", align: "center", valign: "middle" } });
 
-const nodeR = 0.13; // radius = half of 0.26"
-const spacing = (timelineEndX - timelineStartX) / (milestones.length - 1);
-
-milestones.forEach((m, i) => {
-  const cx = timelineStartX + i * spacing;
-
-  // Node circle (navy filled)
-  slide.addShape(pres.shapes.OVAL, {
-    x: cx - nodeR, y: timelineY - nodeR, w: 0.26, h: 0.26,
-    fill: { color: NAVY }
-  });
-
-  // Year label inside node
-  slide.addText(m.year, {
-    x: cx - nodeR, y: timelineY - nodeR, w: 0.26, h: 0.26,
-    fontFace: "Calibri", fontSize: 7.5, bold: true, color: "FFFFFF",
-    align: "center", valign: "middle", margin: 0
-  });
-
-  // Vertical tick mark (1pt navy, 0.15" tall)
-  if (m.above) {
-    slide.addShape(pres.shapes.LINE, {
-      x: cx, y: timelineY - nodeR - 0.15, w: 0, h: 0.15,
-      line: { color: NAVY, width: 1 }
-    });
-    // Label above
-    slide.addText(m.label, {
-      x: cx - 0.7, y: timelineY - nodeR - 0.15 - 0.45, w: 1.4, h: 0.45,
-      fontFace: "Calibri", fontSize: 8.5, color: DARK_GREY,
-      align: "center", valign: "bottom", margin: 0
-    });
-  } else {
-    slide.addShape(pres.shapes.LINE, {
-      x: cx, y: timelineY + nodeR, w: 0, h: 0.15,
-      line: { color: NAVY, width: 1 }
-    });
-    // Label below
-    slide.addText(m.label, {
-      x: cx - 0.7, y: timelineY + nodeR + 0.15, w: 1.4, h: 0.45,
-      fontFace: "Calibri", fontSize: 8.5, color: DARK_GREY,
-      align: "center", valign: "top", margin: 0
-    });
-  }
-});
-
-// === DATA TABLE ===
-const tableX = 0.5;
-const tableY = 3.7;
-const tableW = 12.33;
-const colW = [2.83, 1.9, 1.9, 1.9, 1.9, 1.9];
-
-// Border definitions
-const navyBorderTop = { pt: 1.5, color: NAVY };
-const navyBorderBottom = { pt: 1.5, color: NAVY };
-const navyBorderBottomThin = { pt: 1, color: NAVY };
-const lightGreyBorder = { pt: 0.5, color: LIGHT_GREY };
-const noBorder = { pt: 0, color: "FFFFFF" };
-
-// Header row options (shared)
-const headerOptBase = {
-  fontFace: "Calibri", fontSize: 8.5, bold: true, color: NAVY, align: "center", valign: "middle",
-  border: [navyBorderTop, noBorder, navyBorderBottom, noBorder]
-};
-const headerOptLeft = { ...headerOptBase, align: "left" };
-
-// Body row options
-const bodyOptCenter = {
-  fontFace: "Calibri", fontSize: 8, color: DARK_GREY, align: "center", valign: "middle",
-  border: [noBorder, noBorder, lightGreyBorder, noBorder]
-};
-const bodyOptLeft = {
-  fontFace: "Calibri", fontSize: 8.5, bold: true, color: "333333", align: "left", valign: "middle",
-  border: [noBorder, noBorder, lightGreyBorder, noBorder]
-};
-
-// Last row options (navy bottom border)
-const lastRowOptCenter = {
-  fontFace: "Calibri", fontSize: 8, color: DARK_GREY, align: "center", valign: "middle",
-  border: [noBorder, noBorder, navyBorderBottomThin, noBorder]
-};
-const lastRowOptLeft = {
-  fontFace: "Calibri", fontSize: 8.5, bold: true, color: "333333", align: "left", valign: "middle",
-  border: [noBorder, noBorder, navyBorderBottomThin, noBorder]
-};
-
-const tableData = [
-  // Header
+const rows = [
   [
-    { text: "Metric", options: headerOptLeft },
-    { text: "2020", options: { ...headerOptBase } },
-    { text: "2025", options: { ...headerOptBase } },
-    { text: "2028", options: { ...headerOptBase } },
-    { text: "2030", options: { ...headerOptBase } },
-    { text: "2035", options: { ...headerOptBase } }
+    { text: "", options: { fill: { color: "FFFFFF" }, fontSize: 9 } },
+    hdr("Global H2\ndemand\nMt p.a."),
+    hdr("Thereof\nGrey H2\nMt p.a. (Share %)"),
+    hdr("Thereof\nBlue+Green H2\nMt p.a."),
+    hdr("Production cost\nGrey H2\n$/kg"),
+    hdr("Production cost\nBlue H2\n$/kg"),
+    hdr("Production cost\nGreen H2\n$/kg")
   ],
-  // Row 1
   [
-    { text: "Electrolyzer capacity (GW)", options: { ...bodyOptLeft } },
-    { text: "0.0", options: { ...bodyOptCenter } },
-    { text: "0.5", options: { ...bodyOptCenter } },
-    { text: "2.0", options: { ...bodyOptCenter } },
-    { text: "3\u20134", options: { ...bodyOptCenter } },
-    { text: "6\u20138", options: { ...bodyOptCenter } }
+    lbl("2018"),
+    cell("73"),
+    cell("73 (100%)"),
+    cell("~0"),
+    cell("\u25A0 ~1.0-2.5"),
+    cell("\u25A1 ~1.5-3.0"),
+    cell("4.3")
   ],
-  // Row 2
   [
-    { text: "Green H\u2082 cost (\u20AC/kg)", options: { ...bodyOptLeft } },
-    { text: "6.0\u20138.0", options: { ...bodyOptCenter } },
-    { text: "4.0\u20135.0", options: { ...bodyOptCenter } },
-    { text: "2.5\u20133.5", options: { ...bodyOptCenter } },
-    { text: "1.5\u20132.5", options: { ...bodyOptCenter } },
-    { text: "1.0\u20131.5", options: { ...bodyOptCenter } }
+    lbl("2030"),
+    cell("110"),
+    cell("73+X (>70%)"),
+    cell("Up to 37"),
+    cell("\u25A0 ~1.0-2.5"),
+    cell("\u25A1 ~1.5-3.0"),
+    cell("\u25A1 2.0")
   ],
-  // Row 3 (last row - navy bottom border)
   [
-    { text: "H\u2082 production (kt/yr)", options: { ...lastRowOptLeft } },
-    { text: "<1", options: { ...lastRowOptCenter } },
-    { text: "20\u201340", options: { ...lastRowOptCenter } },
-    { text: "100\u2013200", options: { ...lastRowOptCenter } },
-    { text: "300\u2013500", options: { ...lastRowOptCenter } },
-    { text: "800\u20131,200", options: { ...lastRowOptCenter } }
+    lbl("2050"),
+    cell("545"),
+    cell("73+/-X (<20%)"),
+    cell("Up to 472"),
+    cell("\u201C"),
+    cell("\u201C"),
+    cell("\u25A0 1.3")
   ]
 ];
 
-slide.addTable(tableData, {
-  x: tableX, y: tableY, w: tableW,
-  colW: colW,
-  rowH: [0.3, 0.3, 0.3, 0.3],
-  margin: [2, 4, 2, 4]
+slide.addTable(rows, {
+  x: 0.5, y: 1.46, w: 9, h: 1.8,
+  border: { pt: 0.5, color: "D0D0D0" },
+  colW: [0.7, 1.1, 1.5, 1.2, 1.1, 1.1, 1.3],
+  rowH: [0.55, 0.4, 0.4, 0.4]
 });
 
-// === FOOTNOTE ===
-slide.addText("Note: Capacity and cost projections are indicative targets based on national and EU policy documents; actual figures may vary.", {
-  x: 0.5, y: 5.2, w: 12.33, h: 0.2,
-  fontFace: "Calibri", fontSize: 6.5, italic: true, color: MED_GREY,
-  valign: "top", margin: 0
-});
+// === Additional context text ===
+slide.addText(
+  "Green hydrogen cost trajectory follows a similar pattern to solar PV, which saw an 89% cost\n" +
+  "reduction between 2010-2020. Key drivers include falling electrolyzer costs, increasing renewable\n" +
+  "energy availability, and scaling of manufacturing capacity.",
+  {
+    x: 0.5, y: 3.45, w: 9, h: 0.5,
+    fontSize: 9, fontFace: "Calibri", color: "333333", margin: 0,
+    lineSpacingMultiple: 1.3
+  }
+);
 
-// === FOOTER ===
-// Footer rule line
+// === Footnotes ===
+slide.addText(
+  "1.  Estimates by Hydrogen Council; Grey H2 production costs assuming natural gas prices of $4-$8/mmBtu; Blue H2 costs assuming Grey costs + $0.5/kg;\n" +
+  "     Green H2 costs assuming IRENA database weighted average solar PV costs (auctions and PPAs) in 2020",
+  {
+    x: 0.5, y: 4.55, w: 8.5, h: 0.3,
+    fontSize: 6, fontFace: "Calibri", color: "666666", margin: 0,
+    lineSpacingMultiple: 1.15
+  }
+);
+
+// === Footer line ===
 slide.addShape(pres.shapes.LINE, {
-  x: 0.5, y: 6.45, w: 12.33, h: 0,
+  x: 0.5, y: 5.1, w: 9, h: 0,
   line: { color: "333333", width: 0.5 }
 });
 
-// Source text (left)
-slide.addText("Source: Dutch Ministry of Economic Affairs and Climate Policy; European Commission REPowerEU; HyNetwork Services", {
-  x: 0.5, y: 6.5, w: 8, h: 0.25,
-  fontFace: "Calibri", fontSize: 7, color: MED_GREY,
-  valign: "top", margin: 0
+// === Footer ===
+slide.addText("McKinsey & Company    5", {
+  x: 7, y: 5.15, w: 2.5, h: 0.2,
+  fontSize: 8, fontFace: "Calibri", color: "666666", align: "right", margin: 0
 });
 
-// McKinsey branding (right) + page number
-slide.addText([
-  { text: "McKinsey & Company", options: { bold: true, fontFace: "Calibri", fontSize: 8, color: "000000" } },
-  { text: "  1", options: { fontFace: "Calibri", fontSize: 8, color: "000000" } }
-], {
-  x: 9.5, y: 6.5, w: 3.33, h: 0.25,
-  align: "right", valign: "top", margin: 0
-});
-
-// === SAVE ===
 pres.writeFile({ fileName: "/Users/lifeichen/Skill-Forge/output/slide_v4.pptx" })
-  .then(() => console.log("slide_v4.pptx created successfully"))
-  .catch(err => console.error("Error:", err));
+  .then(() => console.log("Created slide_v4.pptx"))
+  .catch(err => console.error(err));

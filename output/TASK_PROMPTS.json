@@ -1,0 +1,17 @@
+[
+  {
+    "id": "h2_comparison",
+    "prompt": "Generate a 1-slide PowerPoint comparing three hydrogen production methods (Grey, Blue, Green) with a structured comparison table showing Production process, CO2 emissions, Investment scale, EPC duration, and Link to power sector. Include footnotes and sources.",
+    "description": "Comparison matrix slide (like ref-04)"
+  },
+  {
+    "id": "h2_costs",
+    "prompt": "Generate a 1-slide PowerPoint showing global H2 demand and production costs from 2018 to 2050. Include a data table with rows for years (2018, 2030, 2050) and columns for Global H2 demand (Mt p.a.), Grey H2 share, Blue+Green H2 share, and production costs per type ($/kg). Add a legend for least-cost and 2nd least-cost options.",
+    "description": "Data table with projections (like ref-05)"
+  },
+  {
+    "id": "ev_market",
+    "prompt": "Generate a 1-slide PowerPoint comparing the EV market across three regions (China, Europe, US). Include a comparison table with rows for Market size (2024), Growth rate, Key players, Government incentives, Charging infrastructure, and Market outlook. Use data-rich content with specific numbers.",
+    "description": "Regional comparison matrix"
+  }
+]
