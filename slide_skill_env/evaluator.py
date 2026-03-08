@@ -21,65 +21,22 @@ import urllib.request
 from google import genai
 from google.genai import types
 
-EVALUATION_RUBRIC = """You are an expert slide design evaluator.
+EVALUATION_RUBRIC = """You are an expert McKinsey & Company slide design evaluator.
 
-You will be shown:
-1. REFERENCE IMAGES: Gold-standard slides provided by the user. These represent the target visual style.
-2. CANDIDATE SLIDE: A programmatically generated slide rendered as a JPEG image.
-
-Score how closely the CANDIDATE SLIDE matches the visual style in the REFERENCE IMAGES.
+You will be shown reference images from a real McKinsey deck, then a candidate slide to score.
 
 ## Scoring Rubric (100 points total)
 
-### 1. Background & Base Layout (0-15 points)
-- Clean background matching reference style
-- Proper margins (~0.5" all sides)
-- No unnecessary visual clutter
+1. Background & Layout (0-15): White bg, clean margins, no clutter
+2. Color Palette (0-15): Restrained navy/white/grey, no rainbow
+3. Typography (0-15): Serif title, sans-serif body, clear hierarchy
+4. Title Quality (0-15): Insight-driven "so-what" conclusion, not topic label
+5. Data Presentation (0-15): Structured table with navy header borders
+6. Structural Elements (0-15): Divider line, footer, footnotes, source
+7. Overall Impression (0-10): Does it feel like real McKinsey output?
 
-### 2. Color Palette Fidelity (0-15 points)
-- Matches reference color palette
-- Restrained, professional palette
-- Accent colors used sparingly
-
-### 3. Typography (0-15 points)
-- Font hierarchy matches reference
-- Clear size hierarchy: title >> subtitle >> body >> footnotes
-
-### 4. Title Quality — "So-What" Style (0-15 points)
-- Insight-driven conclusion title, not just a topic label
-- Title tells the key takeaway without reading the slide
-
-### 5. Data Presentation (0-15 points)
-- Data format matches reference style (tables, charts, etc.)
-- Organized, scannable, well-structured
-
-### 6. Structural Elements (0-15 points)
-- Divider lines, footers, footnotes matching reference
-- Source attribution, page numbers present
-
-### 7. Overall Visual Impression (0-10 points)
-- Does this feel like it came from the same source as the references?
-- Clean, restrained, and authoritative
-
-## Output Format
-
-Return ONLY a JSON object with this exact structure (no markdown, no code fences):
-{
-    "scores": {
-        "background_layout": <0-15>,
-        "color_palette": <0-15>,
-        "typography": <0-15>,
-        "title_quality": <0-15>,
-        "data_presentation": <0-15>,
-        "structural_elements": <0-15>,
-        "overall_impression": <0-10>
-    },
-    "total": <sum of all scores, 0-100>,
-    "strengths": ["<strength 1>", "<strength 2>", ...],
-    "weaknesses": ["<weakness 1>", "<weakness 2>", ...],
-    "one_line_verdict": "<one sentence summary>"
-}
-"""
+Return ONLY valid JSON:
+{"scores":{"background_layout":0,"color_palette":0,"typography":0,"title_quality":0,"data_presentation":0,"structural_elements":0,"overall_impression":0},"total":0,"strengths":["..."],"weaknesses":["..."],"one_line_verdict":"..."}"""
 
 
 PATRONUS_CRITERIA = "mckinsey-slide-eval:1"
@@ -247,17 +204,37 @@ def evaluate_slide(
         config=types.GenerateContentConfig(
             system_instruction=EVALUATION_RUBRIC,
             temperature=0.2,
-            max_output_tokens=2048,
+            max_output_tokens=4096,
+            response_mime_type="application/json",
+            response_schema={
+                "type": "object",
+                "properties": {
+                    "scores": {
+                        "type": "object",
+                        "properties": {
+                            "background_layout": {"type": "integer"},
+                            "color_palette": {"type": "integer"},
+                            "typography": {"type": "integer"},
+                            "title_quality": {"type": "integer"},
+                            "data_presentation": {"type": "integer"},
+                            "structural_elements": {"type": "integer"},
+                            "overall_impression": {"type": "integer"},
+                        },
+                        "required": ["background_layout", "color_palette", "typography",
+                                     "title_quality", "data_presentation",
+                                     "structural_elements", "overall_impression"],
+                    },
+                    "total": {"type": "integer"},
+                    "strengths": {"type": "array", "items": {"type": "string"}},
+                    "weaknesses": {"type": "array", "items": {"type": "string"}},
+                    "one_line_verdict": {"type": "string"},
+                },
+                "required": ["scores", "total", "strengths", "weaknesses", "one_line_verdict"],
+            },
         ),
     )
 
     text = response.text.strip()
-    # Extract JSON from markdown fences if present
-    json_match = re.search(r"\{.*\}", text, re.DOTALL)
-    if json_match:
-        text = json_match.group(0)
-    # Fix trailing commas
-    text = re.sub(r",\s*([}\]])", r"\1", text)
     try:
         result = json.loads(text)
     except json.JSONDecodeError:

@@ -1,24 +1,45 @@
 # Skill Forge
 
-An RL environment that teaches AI to generate **professional consulting-quality slides** — automatically. It uses a generate-evaluate-optimize loop where an LLM agent iteratively rewrites its own design instructions, reaching **98/100 in just 2 steps** with zero human feedback.
+An RL environment that teaches AI to generate **professional consulting-quality slides** — automatically. It uses a generate-evaluate-optimize loop where an LLM agent iteratively rewrites its own design instructions, reaching **94/100 in just 1 step** with zero human feedback.
 
 ## Training Metrics
 
-### Latest Run (OpenEnv + 1M Context)
+### Latest Run (OpenEnv + Aligned Evaluator)
 
 ```
-Step 0  ████░░░░░░░░░░░░░░░░  20/100   (baseline — neon palette, layout errors)
-Step 1  █████████████░░░░░░░  66/100   (white bg, table structure, wrong font)
-Step 2  ███████████████████░  98/100   (near-perfect McKinsey match)
+Step 0  ██████░░░░░░░░░░░░░░  33/100   (baseline — teal palette, no McKinsey elements)
+Step 1  ███████████████████░  94/100   (white bg, structured table, insight title)
 ```
 
-> **98/100** — "An exceptional slide that perfectly captures the target consulting style, with highly professional layout and formatting."
+> **94/100** — "A highly professional, McKinsey-style slide with an exceptionally strong action title and clean, structured data presentation."
 
-### Previous Run (Manual Loop, 7 Steps)
+Converges in **1 step** thanks to:
+- **1M context beta** — full skill documentation passes through (no truncation)
+- **Aligned evaluator** — explicit "white background" criterion matches reference images
+- **Gemini JSON mode** — structured output schema eliminates parse errors
+
+### Previous Runs
 
 <details>
 <summary>Click to expand</summary>
 
+**Run 2 — Fixed rubric, no JSON mode** (parse errors on steps 3-4):
+```
+Step 0  █████░░░░░░░░░░░░░░░  27/100
+Step 1  ██████████░░░░░░░░░░  52/100
+Step 2  █████████████████░░░  89/100
+Step 3  ░░░░░░░░░░░░░░░░░░░░   0/100   (JSON parse error — actual ~96)
+Step 4  ░░░░░░░░░░░░░░░░░░░░   0/100   (JSON parse error — actual ~83)
+```
+
+**Run 1 — Vague rubric** (dark background scored high due to evaluator blind spot):
+```
+Step 0  ████░░░░░░░░░░░░░░░░  20/100
+Step 1  █████████████░░░░░░░  66/100
+Step 2  ███████████████████░  98/100   (dark navy bg — evaluator didn't penalize)
+```
+
+**Manual Loop (7 Steps, pre-OpenEnv)**:
 ```
 Step 0  ████░░░░░░░░░░░░░░░░  43/100   (baseline — dark teal, wrong style)
 Step 1  ████████░░░░░░░░░░░░  63/100   (white bg, insight title)
@@ -32,9 +53,11 @@ Step 7  ███████████████████░  97/100   (
 
 </details>
 
-### Key Improvement: 1M Context Window
+### Key Improvements
 
-The managed `pptx` skill loads ~150K tokens of documentation into context. With the default 200K window, skill files had to be truncated to ~2000 chars — starving the optimizer of design detail. Enabling the **1M context beta** (`context-1m-2025-08-07`) removed this bottleneck, allowing full skill files to pass through and cutting convergence from 7 steps to 2.
+1. **1M Context Window** — The managed `pptx` skill loads ~150K tokens of documentation. Enabling `context-1m-2025-08-07` removed truncation, allowing full skill files to pass through.
+2. **Evaluator-Reference Alignment** — The evaluator rubric explicitly specifies "White bg" to match McKinsey reference images. A vague rubric ("clean background") let dark-themed slides score 98/100 despite white-background references.
+3. **Gemini JSON Mode** — `response_mime_type="application/json"` + `response_schema` eliminates truncated/malformed JSON that caused 0-score parse errors.
 
 ### Reward Signal
 
