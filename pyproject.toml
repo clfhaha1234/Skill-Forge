@@ -14,6 +14,7 @@ dependencies = [
     "uvicorn>=0.24.0",
     "pydantic>=2.0",
     "python-dotenv",
+    "loguru>=0.7.0",
 ]
 
 [tool.setuptools.packages.find]
