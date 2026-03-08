@@ -8,3 +8,8 @@ __pycache__/
 .ruff_cache/
 dist/
 *.egg-info/
+
+output/*.jpg
+output/*.png
+output/*.pdf
+output/*.pptx
