@@ -71,11 +71,13 @@ class SlideSkillEnvironment(Environment[SkillAction, SkillObservation, SkillStat
             for img in raw_refs
         ]
 
-        # Setup temp directory
-        self._episode_dir = Path(tempfile.mkdtemp(prefix=f"slide_skill_{eid}_"))
+        # Setup persistent output directory (survives server restart)
+        persist_root = Path(os.getenv("SLIDE_SKILL_OUTPUT_DIR", "output"))
+        self._episode_dir = persist_root / f"episode_{eid}"
+        self._episode_dir.mkdir(parents=True, exist_ok=True)
         skill_dir = self._episode_dir / "skill"
         slides_dir = self._episode_dir / "slides"
-        slides_dir.mkdir()
+        slides_dir.mkdir(exist_ok=True)
 
         # Initialize skill folder
         self._skill_manager = SkillManager(skill_dir)
@@ -148,6 +150,11 @@ class SlideSkillEnvironment(Environment[SkillAction, SkillObservation, SkillStat
 
         # 2. GENERATE
         skill_files = self._skill_manager.snapshot()
+        # Save skill snapshot for this step
+        snap_dir = self._episode_dir / f"skill_step_{step_num}"
+        snap_dir.mkdir(exist_ok=True)
+        for name, content in skill_files.items():
+            (snap_dir / name).write_text(content)
         pptx_path = slides_dir / f"slide_step_{step_num}.pptx"
         generate_slide(self._task_prompt, skill_files, pptx_path)
 
@@ -214,7 +221,6 @@ class SlideSkillEnvironment(Environment[SkillAction, SkillObservation, SkillStat
         self._cleanup()
 
     def _cleanup(self) -> None:
-        if self._episode_dir and self._episode_dir.exists():
-            shutil.rmtree(self._episode_dir, ignore_errors=True)
+        # Keep episode directory for inspection — only reset internal refs
         self._episode_dir = None
         self._skill_manager = None

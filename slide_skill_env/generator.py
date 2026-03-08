@@ -1,5 +1,7 @@
 """Generate slides using Claude Sonnet 4.6 + managed pptx skill."""
 
+from __future__ import annotations
+
 import os
 from pathlib import Path
 
@@ -29,25 +31,22 @@ def generate_slide(
     key = api_key or os.environ["ANTHROPIC_API_KEY"]
     client = anthropic.Anthropic(api_key=key)
 
-    # Build message with skill files as context (cap total size at 4000 chars)
+    # Build message with skill files as context.
+    # With 1M context beta, no need to truncate skill files.
     skill_context = ""
-    total_len = sum(len(c) for c in skill_files.values())
     for filename, content in skill_files.items():
-        if total_len > 4000:
-            max_chars = int(4000 * len(content) / total_len)
-            content = content[:max_chars] + "\n... (truncated)"
-        skill_context += f"\n### {filename}\n```\n{content}\n```\n"
+        skill_context += f"\n### {filename}\n{content}\n"
 
     message_content = (
-        f"Follow these design rules exactly when generating the slide:\n"
+        f"Follow these design rules when generating the slide:\n"
         f"{skill_context}\n\n"
-        f"## Task\n{task_prompt}"
+        f"Task: {task_prompt}"
     )
 
     response = client.beta.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=8192,
-        betas=["code-execution-2025-08-25", "skills-2025-10-02"],
+        betas=["code-execution-2025-08-25", "skills-2025-10-02", "context-1m-2025-08-07"],
         container={
             "skills": [
                 {"type": "anthropic", "skill_id": "pptx", "version": "latest"}
