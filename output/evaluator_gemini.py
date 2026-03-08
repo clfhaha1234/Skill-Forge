@@ -1,41 +1,43 @@
 #!/usr/bin/env python3
 """
-PPT Slide Evaluator — Uses Claude Opus 4.6 to score generated slides
+PPT Slide Evaluator (Gemini) — Uses Gemini 3.1 Pro to score generated slides
 against McKinsey reference images.
 
 Usage:
-    python3 evaluator.py                          # Evaluate all v0-v5
-    python3 evaluator.py slide_v3-1.jpg           # Evaluate single slide
-    python3 evaluator.py slide_v3-1.jpg slide_v5-1.jpg  # Evaluate specific slides
+    python3 evaluator_gemini.py                          # Evaluate all v0-v5
+    python3 evaluator_gemini.py slide_v3-1.jpg           # Evaluate single slide
 
-Output: evaluation_results.json (and prints summary to stdout)
-
-Requires: ANTHROPIC_API_KEY environment variable
+Output: evaluation_results_gemini.json
 """
 
-import anthropic
-import base64
+from google import genai
+from google.genai import types
 import json
+import re
 import sys
-import os
 from pathlib import Path
 
-# Load API key from .env if not in environment
+# Load API key from .env
 ENV_PATH = Path(__file__).parent.parent / ".env"
-if ENV_PATH.exists() and not os.environ.get("ANTHROPIC_API_KEY"):
+GEMINI_API_KEY = None
+if ENV_PATH.exists():
     for line in ENV_PATH.read_text().splitlines():
-        if line.startswith("ANTHROPIC_API_KEY="):
-            os.environ["ANTHROPIC_API_KEY"] = line.split("=", 1)[1].strip()
+        if line.startswith("GEMINI_API_KEY="):
+            GEMINI_API_KEY = line.split("=", 1)[1].strip()
+if not GEMINI_API_KEY:
+    import os
+    GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+
+MODEL = "gemini-3.1-pro-preview"
 
 OUTPUT_DIR = Path(__file__).parent
 
-# Reference images to include in every evaluation call
 REFERENCE_IMAGES = [
-    OUTPUT_DIR / "reference" / "ref-01.jpg",   # Cover page
-    OUTPUT_DIR / "reference" / "ref-02.jpg",   # Content page
-    OUTPUT_DIR / "reference" / "ref-03.jpg",   # Data/chart page
-    OUTPUT_DIR / "reference" / "ref-04.jpg",   # Data/chart page
-    OUTPUT_DIR / "reference" / "ref-05.jpg",   # Content page
+    OUTPUT_DIR / "reference" / "ref-01.jpg",
+    OUTPUT_DIR / "reference" / "ref-02.jpg",
+    OUTPUT_DIR / "reference" / "ref-03.jpg",
+    OUTPUT_DIR / "reference" / "ref-04.jpg",
+    OUTPUT_DIR / "reference" / "ref-05.jpg",
 ]
 
 EVALUATION_PROMPT = """You are an expert McKinsey & Company slide design evaluator.
@@ -61,7 +63,6 @@ Your job: Score how closely the CANDIDATE SLIDE matches the McKinsey visual styl
 - McKinsey uses a RESTRAINED palette: navy/dark blue (#0C2340-ish), white, light greys
 - Accent colors are used SPARINGLY — typically just 1-2 accent colors max
 - NO rainbow effects, no bright multi-color schemes
-- Crimson/red used only for thin divider lines, not large elements
 - 15: Matches McKinsey's restrained navy/white/grey palette perfectly
 - 10: Mostly correct but 1-2 color choices off
 - 5: Too many colors or wrong color family
@@ -98,7 +99,7 @@ Your job: Score how closely the CANDIDATE SLIDE matches the McKinsey visual styl
 - 0: No supporting data
 
 ### 6. Structural Elements (0-15 points)
-- Thin crimson/red divider line below title area (not touching title — separated by whitespace)
+- Thin divider line below title area (not touching title — separated by whitespace)
 - McKinsey footer: thin rule line + source text (left) + "McKinsey & Company" bold (right) + page number
 - Numbered footnotes for data disclaimers
 - Source attribution line
@@ -118,81 +119,62 @@ Your job: Score how closely the CANDIDATE SLIDE matches the McKinsey visual styl
 
 ## Output Format
 
-Return ONLY a JSON object with this exact structure (no markdown, no code fences):
-{
-    "scores": {
-        "background_layout": <0-15>,
-        "color_palette": <0-15>,
-        "typography": <0-15>,
-        "title_quality": <0-15>,
-        "data_presentation": <0-15>,
-        "structural_elements": <0-15>,
-        "overall_impression": <0-10>
-    },
-    "total": <sum of all scores, 0-100>,
-    "strengths": ["<strength 1>", "<strength 2>", ...],
-    "weaknesses": ["<weakness 1>", "<weakness 2>", ...],
-    "one_line_verdict": "<one sentence summary>"
-}
+You MUST return ONLY a valid JSON object. No explanation, no markdown fences, no extra text.
+The JSON must have this exact structure:
+{"scores":{"background_layout":0,"color_palette":0,"typography":0,"title_quality":0,"data_presentation":0,"structural_elements":0,"overall_impression":0},"total":0,"strengths":["..."],"weaknesses":["..."],"one_line_verdict":"..."}
 """
 
 
-def encode_image(path: Path) -> dict:
-    """Encode an image file to base64 for the Anthropic API."""
-    data = base64.standard_b64encode(path.read_bytes()).decode("utf-8")
-    suffix = path.suffix.lower()
-    media_type = "image/jpeg" if suffix in (".jpg", ".jpeg") else "image/png"
-    return {
-        "type": "image",
-        "source": {
-            "type": "base64",
-            "media_type": media_type,
-            "data": data,
-        },
-    }
+def evaluate_slide(client: genai.Client, slide_path: Path) -> dict:
+    """Send reference + candidate images to Gemini and get structured scores."""
+    parts = []
 
-
-def evaluate_slide(client: anthropic.Anthropic, slide_path: Path) -> dict:
-    """Send reference + candidate images to Claude and get structured scores."""
-    # Build content array: reference images first, then the candidate
-    content = []
-
-    content.append({"type": "text", "text": "## REFERENCE IMAGES (Real McKinsey deck)\nThe following 5 images are from a real McKinsey & Company consulting report. Study their visual style carefully."})
+    parts.append(types.Part.from_text(text="## REFERENCE IMAGES (Real McKinsey deck)\nThe following 5 images are from a real McKinsey & Company consulting report. Study their visual style carefully."))
 
     for i, ref_path in enumerate(REFERENCE_IMAGES, 1):
         if ref_path.exists():
-            content.append(encode_image(ref_path))
-            content.append({"type": "text", "text": f"(Reference page {i})"})
+            parts.append(types.Part.from_bytes(data=ref_path.read_bytes(), mime_type="image/jpeg"))
+            parts.append(types.Part.from_text(text=f"(Reference page {i})"))
 
-    content.append({"type": "text", "text": f"\n## CANDIDATE SLIDE TO EVALUATE\nThis is the generated slide: {slide_path.name}"})
-    content.append(encode_image(slide_path))
+    parts.append(types.Part.from_text(text=f"\n## CANDIDATE SLIDE TO EVALUATE\nThis is the generated slide: {slide_path.name}"))
+    parts.append(types.Part.from_bytes(data=slide_path.read_bytes(), mime_type="image/jpeg"))
+    parts.append(types.Part.from_text(text="\nNow score this candidate slide against the McKinsey reference using the rubric. Return ONLY the JSON object, nothing else."))
 
-    content.append({"type": "text", "text": "\nNow score this candidate slide against the McKinsey reference using the rubric. Return ONLY the JSON object."})
-
-    response = client.messages.create(
-        model="claude-opus-4-6",
-        max_tokens=1024,
-        system=EVALUATION_PROMPT,
-        messages=[{"role": "user", "content": content}],
+    response = client.models.generate_content(
+        model=MODEL,
+        contents=[types.Content(role="user", parts=parts)],
+        config=types.GenerateContentConfig(
+            system_instruction=EVALUATION_PROMPT,
+            max_output_tokens=2048,
+            temperature=0.2,
+        ),
     )
 
-    # Parse JSON from response
-    text = response.content[0].text.strip()
-    # Handle potential markdown code fences
+    # Get text from response, handling thought_signature parts
+    text = ""
+    for part in response.candidates[0].content.parts:
+        if hasattr(part, "text") and part.text:
+            text += part.text
+    text = text.strip()
+
+    # Handle markdown code fences
     if text.startswith("```"):
         text = text.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+
+    # Try to extract JSON from response
+    json_match = re.search(r'\{[\s\S]*\}', text)
+    if json_match:
+        text = json_match.group(0)
+
     return json.loads(text)
 
 
 def main():
-    # Determine which slides to evaluate
     if len(sys.argv) > 1:
         slide_paths = [OUTPUT_DIR / arg for arg in sys.argv[1:]]
     else:
-        # Default: evaluate all v0-v5
         slide_paths = [OUTPUT_DIR / f"slide_v{i}-1.jpg" for i in range(6)]
 
-    # Verify files exist
     missing = [p for p in slide_paths if not p.exists()]
     if missing:
         print(f"ERROR: Missing files: {[str(p) for p in missing]}")
@@ -203,12 +185,12 @@ def main():
         print(f"ERROR: Missing reference images: {[str(p) for p in ref_missing]}")
         sys.exit(1)
 
-    client = anthropic.Anthropic()  # Uses ANTHROPIC_API_KEY env var
+    client = genai.Client(api_key=GEMINI_API_KEY)
 
     results = {}
     for slide_path in slide_paths:
-        name = slide_path.stem  # e.g., "slide_v3-1"
-        version = name.split("_")[1].split("-")[0]  # e.g., "v3"
+        name = slide_path.stem
+        version = name.split("_")[1].split("-")[0]
         print(f"Evaluating {version} ({slide_path.name})...", flush=True)
 
         try:
@@ -219,13 +201,11 @@ def main():
             print(f"  ERROR evaluating {version}: {e}")
             results[version] = {"error": str(e)}
 
-    # Save results
-    output_path = OUTPUT_DIR / "evaluation_results.json"
+    output_path = OUTPUT_DIR / "evaluation_results_gemini.json"
     with open(output_path, "w") as f:
         json.dump(results, f, indent=2)
     print(f"\nResults saved to {output_path}")
 
-    # Print summary table
     if any("total" in v for v in results.values()):
         print("\n" + "=" * 60)
         print(f"{'Version':<10} {'Score':<8} {'Verdict'}")

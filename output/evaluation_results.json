@@ -1,4 +1,125 @@
 {
+  "v0": {
+    "scores": {
+      "background_layout": 3,
+      "color_palette": 3,
+      "typography": 7,
+      "title_quality": 3,
+      "data_presentation": 4,
+      "structural_elements": 3,
+      "overall_impression": 2
+    },
+    "total": 25,
+    "strengths": [
+      "Uses a bold serif font for the title, echoing McKinsey's Georgia-style title convention",
+      "Clean horizontal timeline layout with reasonable spacing between milestones",
+      "Left-aligned title placement is consistent with McKinsey positioning"
+    ],
+    "weaknesses": [
+      "Dark navy background used for a data/content slide \u2014 McKinsey reserves dark backgrounds only for section dividers/covers, not timeline content slides",
+      "Teal/mint green color scheme is completely wrong \u2014 McKinsey uses restrained navy/white/grey with minimal accent colors, not bright teal",
+      "Title is a pure topic label ('Dutch Hydrogen Strategy (2020\u20132035)') with no insight or so-what conclusion",
+      "No crimson/red divider line below the title area",
+      "Footer is wrong \u2014 uses a teal banner with centered text instead of McKinsey's thin rule line + left source + right 'McKinsey & Company' + page number format",
+      "No structured table or rigorous data presentation \u2014 just a simple timeline graphic with minimal information",
+      "Subtitle text in teal ('McKinsey & Company | Timeline Overview') is not how McKinsey formats subtitles",
+      "No source attribution, no numbered footnotes, no page number",
+      "Large empty space below timeline wastes the slide real estate \u2014 McKinsey slides are information-dense",
+      "The timeline circles and connecting line use teal which clashes with McKinsey's palette entirely"
+    ],
+    "one_line_verdict": "A dark-background timeline slide with a teal color scheme that fundamentally mismatches McKinsey's white-background, navy/grey content slide format and lacks insight-driven titling."
+  },
+  "v1": {
+    "scores": {
+      "background_layout": 14,
+      "color_palette": 13,
+      "typography": 13,
+      "title_quality": 15,
+      "data_presentation": 13,
+      "structural_elements": 13,
+      "overall_impression": 8
+    },
+    "total": 89,
+    "strengths": [
+      "Excellent insight-driven title that states a clear conclusion with specific data points (500 MW to 3-4 GW by 2030)",
+      "White background with clean margins matches McKinsey content slide style perfectly",
+      "Restrained navy/dark blue color palette consistent with McKinsey's approach",
+      "Well-structured table with clear header row, bold left-column labels, and light grey row dividers",
+      "Proper McKinsey footer with source attribution on left and 'McKinsey & Company' bold on right with page number",
+      "Subtitle line provides helpful context beneath the main title",
+      "Crimson/red divider line below title area is correctly placed",
+      "Timeline visualization is clean and professional with navy circular milestone markers"
+    ],
+    "weaknesses": [
+      "The title font appears to be sans-serif rather than the serif (Georgia-like) font McKinsey uses for titles",
+      "The red divider line appears slightly thicker/more prominent than the typical thin crimson rule in McKinsey decks",
+      "Table header row lacks the distinct navy top+bottom border treatment seen in McKinsey reference tables",
+      "The timeline graphic, while clean, uses a style not commonly seen in the reference McKinsey slides - slightly more infographic-like",
+      "Footnote numbering format could be more precisely aligned with McKinsey conventions"
+    ],
+    "one_line_verdict": "A highly polished slide that closely mirrors McKinsey's visual language with an excellent insight-driven title, proper structural elements, and restrained color palette, falling just short on serif title font and minor table formatting details."
+  },
+  "v2": {
+    "scores": {
+      "background_layout": 14,
+      "color_palette": 13,
+      "typography": 13,
+      "title_quality": 15,
+      "data_presentation": 13,
+      "structural_elements": 10,
+      "overall_impression": 8
+    },
+    "total": 86,
+    "strengths": [
+      "Excellent insight-driven title that states a clear conclusion with specific data points",
+      "White background with clean margins matches McKinsey content slide format",
+      "Restrained navy/white/grey color palette closely matches McKinsey's style",
+      "Strong serif title font with appropriate size hierarchy resembling McKinsey formatting",
+      "Subtitle/descriptor line in grey beneath the title adds proper context",
+      "Table with clean structure, navy header borders, and light row dividers matches McKinsey table conventions",
+      "Timeline visualization is clean, minimal, and uses dark navy circles consistent with the palette",
+      "Source/note footnote at bottom in italicized grey text"
+    ],
+    "weaknesses": [
+      "Missing McKinsey footer with thin rule line, 'McKinsey & Company' text on right, and page number",
+      "The crimson/red divider line below the title area appears but is slightly too prominent compared to McKinsey's thinner treatment",
+      "Timeline section could use slightly more refined spacing - the gap between timeline and table feels a bit large",
+      "Table data values could be more precisely center-aligned to match McKinsey's meticulous formatting",
+      "No numbered footnotes with superscript references in the data as McKinsey typically uses"
+    ],
+    "one_line_verdict": "A strong McKinsey-style slide with an excellent insight title, appropriate color palette, and clean data table, falling short mainly on missing footer elements and minor structural refinements."
+  },
+  "v3": {
+    "scores": {
+      "background_layout": 14,
+      "color_palette": 14,
+      "color_palette_notes": "Restrained navy/white/grey palette, dark blue circles on timeline are appropriate",
+      "typography": 13,
+      "title_quality": 15,
+      "data_presentation": 13,
+      "structural_elements": 14,
+      "overall_impression": 9
+    },
+    "total": 92,
+    "strengths": [
+      "Excellent insight-driven title that states a clear conclusion with specific data points (500 MW to 3-4 GW)",
+      "Clean white background with proper margins and professional spacing",
+      "Restrained color palette matching McKinsey's navy/white/grey scheme precisely",
+      "Well-structured table with clear header row, bold left column labels, and light grey dividers",
+      "Complete footer with source attribution on left, McKinsey & Company bold on right, and page number",
+      "Thin crimson/red divider line below title area properly separated by whitespace",
+      "Timeline visualization is clean and scannable with navy circle milestones",
+      "Subtitle in smaller grey text provides context without competing with title",
+      "Numbered footnote for data disclaimers matches McKinsey convention"
+    ],
+    "weaknesses": [
+      "Title font appears slightly different from McKinsey's Georgia serif - possibly a close but not exact match",
+      "Timeline could benefit from slightly more visual weight or refinement in the connecting line",
+      "Table data alignment could be more precisely center-aligned for numerical values",
+      "Bottom portion of slide has excess whitespace that could be better utilized or the content repositioned upward slightly"
+    ],
+    "one_line_verdict": "A highly polished slide that closely replicates McKinsey's visual style with an excellent insight-driven title, proper structural elements, restrained palette, and clean data presentation \u2014 nearly indistinguishable from authentic McKinsey output."
+  },
   "v4": {
     "scores": {
       "background_layout": 14,
@@ -12,21 +133,52 @@
     "total": 89,
     "strengths": [
       "Excellent insight-driven title that states a clear conclusion with specific data points",
-      "Clean white background with appropriate margins and professional spacing",
-      "Restrained navy/white/grey color palette matching McKinsey's style precisely",
-      "Well-structured footer with source attribution (left), McKinsey & Company branding (right), and page number",
-      "Thin crimson/red divider line below subtitle area correctly placed",
-      "Clean data table with proper header formatting and light row dividers",
-      "Good subtitle providing context beneath the main title",
-      "Timeline visualization is clean and professional with navy circle milestones"
+      "White background with clean margins matching McKinsey content slide format",
+      "Restrained navy/white/grey color palette consistent with McKinsey style",
+      "Proper McKinsey footer with source attribution (left) and 'McKinsey & Company' + page number (right)",
+      "Clean horizontal timeline with navy circular milestones is well-executed and professional",
+      "Subtitle line provides descriptive context without being redundant",
+      "Table has proper structure with bold left-column labels and clean row dividers",
+      "Footnote/note line included for data caveats"
     ],
     "weaknesses": [
-      "The timeline graphic, while clean, takes up significant vertical space and could be more compact to better utilize the slide real estate",
-      "Table data values are center-aligned but the metric labels on the left could be bolder to match McKinsey's typical bold left-column style more precisely",
-      "Significant white space below the note/source area suggests the content could be better distributed vertically",
-      "The timeline connector line is quite thin and the milestone labels could have slightly better visual hierarchy",
-      "Font appears to be sans-serif throughout including the title \u2014 McKinsey typically uses a serif font (Georgia) for titles"
+      "Red/crimson divider line appears slightly too thick compared to McKinsey's very thin rule",
+      "Table format doesn't perfectly match McKinsey style - missing the navy header border (top + bottom of header row) seen in reference slides",
+      "Significant empty white space in the bottom third of the slide could be better utilized",
+      "The timeline visualization, while clean, is a custom element not directly seen in the reference deck - McKinsey might use a more structured approach",
+      "Table data values could be better center-aligned for scannability",
+      "Font appears to be sans-serif throughout including the title - McKinsey uses serif (Georgia-like) for titles"
     ],
-    "one_line_verdict": "A highly professional slide that closely mirrors McKinsey's visual language with an excellent insight-driven title, restrained color palette, and proper structural elements, falling just short on title font choice and vertical space utilization."
+    "one_line_verdict": "A highly polished slide that closely mirrors McKinsey's visual language with an excellent insight-driven title, restrained palette, and proper structural elements, falling just short on table header formatting and title font choice."
+  },
+  "v5": {
+    "scores": {
+      "background_layout": 14,
+      "color_palette": 14,
+      "typography": 13,
+      "title_quality": 15,
+      "data_presentation": 12,
+      "structural_elements": 13,
+      "overall_impression": 8
+    },
+    "total": 89,
+    "strengths": [
+      "Excellent insight-driven title that states a clear conclusion with specific data points",
+      "White background with clean margins and professional spacing matches McKinsey content slides",
+      "Restrained navy/white/grey color palette closely mirrors McKinsey's approach",
+      "Proper McKinsey footer with source attribution on left and 'McKinsey & Company' bold on right with page number",
+      "Thin divider line below title area correctly placed",
+      "Subtitle line providing context beneath the main title mirrors McKinsey's subtitle convention",
+      "Table structure with bold left-column labels and clear header row with year columns",
+      "Footnote/note text present in appropriate small grey font"
+    ],
+    "weaknesses": [
+      "Timeline visualization with dark navy circles is a reasonable design choice but not a format seen in the McKinsey reference pages \u2014 McKinsey tends toward more structured table/matrix layouts",
+      "Table header row lacks the characteristic navy border lines (top and bottom) seen in McKinsey tables \u2014 appears more as a light grey separator",
+      "Significant whitespace below the table and above the footer feels unbalanced \u2014 content could be better distributed",
+      "The divider line appears to be a thin dark line rather than the crimson/red accent line typical of McKinsey",
+      "Font appears to be a sans-serif throughout including the title \u2014 McKinsey typically uses a serif font (Georgia-like) for titles"
+    ],
+    "one_line_verdict": "A highly polished slide that nails the McKinsey insight-driven title, restrained palette, and structural elements, with minor deviations in the timeline visual format and title font choice keeping it just short of indistinguishable."
   }
 }
