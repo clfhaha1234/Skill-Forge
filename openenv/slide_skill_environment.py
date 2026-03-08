@@ -52,6 +52,11 @@ REWARD_SCALE = 100.0  # divide clipped delta by this to get [-0.3, +0.3]
 
 MAX_STEPS = int(os.environ.get("SLIDE_SKILL_MAX_STEPS", "7"))
 
+# Session directory root: defaults to repo/tmp/ locally, configurable via
+# env var so HuggingFace Spaces (read-only app dir) can use /tmp instead.
+_default_session_root = str(REPO_ROOT / "tmp")
+SESSION_ROOT = Path(os.environ.get("SLIDE_SKILL_SESSION_ROOT", _default_session_root))
+
 # Baseline skill files (DESIGN_RULES.md + EXAMPLES.md) and generic pptx
 # tooling files that get copied into each session.
 BASELINE_FILES = ("DESIGN_RULES.md", "EXAMPLES.md")
@@ -86,7 +91,7 @@ class SlideSkillEnvironment:
         """
         session_id = session_id or str(uuid.uuid4())
 
-        session_dir = REPO_ROOT / "tmp" / f"slide_skill_{session_id}"
+        session_dir = SESSION_ROOT / f"slide_skill_{session_id}"
         if session_dir.exists():
             shutil.rmtree(session_dir)
         session_dir.mkdir(parents=True)
