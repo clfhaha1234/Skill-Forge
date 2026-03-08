@@ -1,0 +1,92 @@
+# OpenEnv environment manifest for Slide Skill
+# https://openenv.dev/spec
+
+name: slide-skill
+version: "1.0.0"
+description: >
+  Self-improving McKinsey-style PowerPoint slide generation environment.
+  The agent evolves DESIGN_RULES.md and EXAMPLES.md to maximize a visual
+  design score (0-100) evaluated by Claude Opus 4.6 vision against 5 McKinsey
+  reference images.
+
+author: Tesserae / Skill Forge Hackathon Team
+
+supports_concurrent_sessions: true
+max_steps: 7
+
+# Approximate time budget per step (seconds).
+# Each step: generator LLM (~20-40s) + Node.js (<5s) + LibreOffice (~15-30s)
+# + pdftoppm (<5s) + evaluator LLM (~30-60s)
+step_timeout_seconds: 180
+
+action_space:
+  type: union
+  discriminator: action_type
+  variants:
+    - name: edit_section
+      description: Replace the body of a named section in a skill file.
+      fields:
+        file: {type: string, enum: ["DESIGN_RULES.md", "EXAMPLES.md"]}
+        section_heading: {type: string, description: "Exact heading text without # markers"}
+        new_body: {type: string, description: "New section body content in markdown"}
+
+    - name: replace_file
+      description: Replace the entire content of a skill file.
+      fields:
+        file: {type: string, enum: ["DESIGN_RULES.md", "EXAMPLES.md"]}
+        new_content: {type: string, description: "Complete new file content"}
+
+observation_space:
+  scores:
+    background_layout: {type: integer, min: 0, max: 15}
+    color_palette: {type: integer, min: 0, max: 15}
+    typography: {type: integer, min: 0, max: 15}
+    title_quality: {type: integer, min: 0, max: 15}
+    data_presentation: {type: integer, min: 0, max: 15}
+    structural_elements: {type: integer, min: 0, max: 15}
+    overall_impression: {type: integer, min: 0, max: 10}
+  total: {type: integer, min: 0, max: 100}
+  strengths: {type: array, items: string}
+  weaknesses: {type: array, items: string}
+  one_line_verdict: {type: string}
+  reward: {type: float, min: -0.3, max: 0.3}
+  step: {type: integer}
+  done: {type: boolean}
+  jpg_path: {type: string, description: "Absolute path to generated slide JPG"}
+  design_rules_content: {type: string}
+  examples_content: {type: string}
+
+reward:
+  description: >
+    Normalized score delta vs. previous step, capped to [-0.3, +0.3].
+    Formula: clip(total_score - prev_total_score, -30, +30) / 100
+  range: [-0.3, 0.3]
+
+baseline:
+  description: >
+    skill_files_baseline/ committed to the repo contains the minimal
+    starting DESIGN_RULES.md (teal palette, basic typography) and an
+    empty EXAMPLES.md. This is skill_v0 content — NOT any evolved version.
+
+endpoints:
+  reset: POST /reset
+  step: POST /step
+  close: DELETE /sessions/{session_id}
+  health: GET /health
+
+server:
+  host: 0.0.0.0
+  port: 8000
+  workers: 1  # Do not increase; LibreOffice is not thread-safe within one process
+
+environment_variables:
+  required:
+    - name: GEMINI_API_KEY
+      description: >
+        Google Gemini API key. Used by all three LLM roles:
+        generator (Gemini 3 Flash), evaluator (Gemini 3.1 Pro),
+        and optimizer (Gemini 3.1 Pro).
+  optional:
+    - name: SLIDE_SKILL_MAX_STEPS
+      description: Override default max_steps per episode
+      default: "7"
