@@ -17,4 +17,4 @@ dependencies = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["openenv*"]
+include = ["slide_skill_env*"]
