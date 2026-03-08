@@ -21,8 +21,11 @@ Note on Gemini vs. Anthropic image handling:
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
+
+logger = logging.getLogger(__name__)
 from pathlib import Path
 
 from google import genai
@@ -226,7 +229,7 @@ class EvaluatorAdapter:
             contents=contents,
             config=types.GenerateContentConfig(
                 system_instruction=EVALUATION_SYSTEM_PROMPT,
-                max_output_tokens=2048,
+                max_output_tokens=4096,
             ),
         )
 
@@ -237,7 +240,14 @@ class EvaluatorAdapter:
         if json_match:
             text = json_match.group(0)
 
-        result = json.loads(text)
+        # Fix common LLM JSON issues: trailing commas before } or ].
+        text = re.sub(r",\s*([}\]])", r"\1", text)
+
+        try:
+            result = json.loads(text)
+        except json.JSONDecodeError:
+            logger.error("Evaluator returned unparseable JSON. Raw text:\n%s", text[:2000])
+            raise
 
         # Validate required keys are present.
         required_score_keys = {

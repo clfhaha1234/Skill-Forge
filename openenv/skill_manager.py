@@ -18,14 +18,24 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from models import EditSectionAction, ReplaceFileAction, SlideSkillAction
+from models import (
+    AppendExampleAction,
+    EditJsTemplateAction,
+    EditSectionAction,
+    PatchCodeAction,
+    ReplaceFileAction,
+    SetConstraintAction,
+    SlideSkillAction,
+    SlideSkillState,
+)
 
 
 class SkillManager:
-    """Manages DESIGN_RULES.md and EXAMPLES.md within a session directory."""
+    """Manages skill files and structured state within a session directory."""
 
-    def __init__(self, session_dir: Path) -> None:
+    def __init__(self, session_dir: Path, state: SlideSkillState) -> None:
         self.session_dir = session_dir
+        self.state = state
 
     def apply(self, action: SlideSkillAction) -> None:
         """
@@ -35,19 +45,29 @@ class SkillManager:
             ValueError: If action_type is unrecognized or section not found.
             FileNotFoundError: If the target skill file does not exist.
         """
-        target = self.session_dir / action.file
-        if not target.exists():
-            raise FileNotFoundError(f"Skill file not found in session: {target}")
-
         if action.action_type == "replace_file":
+            target = self.session_dir / action.file
+            if not target.exists():
+                raise FileNotFoundError(f"Skill file not found in session: {target}")
             self._replace_file(target, action)  # type: ignore[arg-type]
         elif action.action_type == "edit_section":
+            target = self.session_dir / action.file
+            if not target.exists():
+                raise FileNotFoundError(f"Skill file not found in session: {target}")
             self._edit_section(target, action)  # type: ignore[arg-type]
+        elif action.action_type == "append_example":
+            self._append_example(action)  # type: ignore[arg-type]
+        elif action.action_type == "edit_js_template":
+            self._edit_js_template(action)  # type: ignore[arg-type]
+        elif action.action_type == "set_constraint":
+            self._set_constraint(action)  # type: ignore[arg-type]
+        elif action.action_type == "patch_code":
+            self._patch_code(action)  # type: ignore[arg-type]
         else:
             raise ValueError(f"Unknown action_type: {action.action_type!r}")
 
     # ------------------------------------------------------------------
-    # Private helpers
+    # File-level actions
     # ------------------------------------------------------------------
 
     @staticmethod
@@ -97,6 +117,58 @@ class SkillManager:
             + lines[end_idx:]  # rest of file after the section
         )
         target.write_text("".join(new_lines), encoding="utf-8")
+
+    # ------------------------------------------------------------------
+    # Structured actions
+    # ------------------------------------------------------------------
+
+    def _append_example(self, action: AppendExampleAction) -> None:
+        """Append a scored example entry to EXAMPLES.md."""
+        examples_path = self.session_dir / "EXAMPLES.md"
+        current = examples_path.read_text(encoding="utf-8")
+
+        entry = (
+            f"\n## Example (score: {action.score}/100)\n"
+            f"**Verdict:** {action.verdict}\n\n"
+            f"{action.description}\n"
+        )
+        examples_path.write_text(current + entry, encoding="utf-8")
+
+    def _edit_js_template(self, action: EditJsTemplateAction) -> None:
+        """Add, update, or remove a named JS template block."""
+        if action.js_code:
+            self.state.js_templates[action.block_name] = action.js_code
+        else:
+            self.state.js_templates.pop(action.block_name, None)
+
+    def _set_constraint(self, action: SetConstraintAction) -> None:
+        """Add or remove a hard constraint."""
+        if action.active:
+            if action.constraint not in self.state.constraints:
+                self.state.constraints.append(action.constraint)
+        else:
+            self.state.constraints = [
+                c for c in self.state.constraints if c != action.constraint
+            ]
+
+    def _patch_code(self, action: PatchCodeAction) -> None:
+        """Add or remove a code patch."""
+        if action.active:
+            # Remove existing patch with same description before adding.
+            self.state.code_patches = [
+                p for p in self.state.code_patches
+                if p["description"] != action.description
+            ]
+            self.state.code_patches.append({
+                "pattern": action.pattern,
+                "replacement": action.replacement,
+                "description": action.description,
+            })
+        else:
+            self.state.code_patches = [
+                p for p in self.state.code_patches
+                if p["description"] != action.description
+            ]
 
     def read_file(self, filename: str) -> str:
         """Read a skill file from the session directory."""

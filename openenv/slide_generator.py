@@ -2,16 +2,17 @@
 Slide Generator — orchestrates the full PPT generation pipeline.
 
 Pipeline (in order):
-    1. LLM reads DESIGN_RULES.md + EXAMPLES.md + TASK_PROMPT.md + pptx/ tooling
+    1. LLM reads skill files + TASK_PROMPT.md + js_templates + constraints
        → writes pptxgenjs JavaScript to generate.js in the session output dir.
-    2. `node generate.js` runs in the session output dir → produces slide.pptx.
-    3. `soffice --headless --convert-to pdf slide.pptx` → slide.pdf.
-    4. `pdftoppm -r 150 -jpeg -f 1 -l 1 slide.pdf slide` → slide-1.jpg (page 1).
-    5. Returns the Path to slide-1.jpg.
+    2. Code patches are applied to the generated JS.
+    3. `node generate.js` runs in the session output dir → produces slide.pptx.
+    4. `soffice --headless --convert-to pdf slide.pptx` → slide.pdf.
+    5. `pdftoppm -r 150 -jpeg -f 1 -l 1 slide.pdf slide` → slide-1.jpg (page 1).
+    6. Returns the Path to slide-1.jpg.
 
-The generator LLM receives the pptx/ tooling files as context so it knows
-the full pptxgenjs API — but those files are read-only; they are never
-written to or returned in the observation.
+Skill files are read from the session directory so that agent edits to
+SKILL.md, editing.md, and pptxgenjs.md take effect. The repo copies are
+only used as fallbacks if a file isn't in the session dir.
 
 Session isolation:
     All generated artifacts (generate.js, slide.pptx, slide.pdf, slide-1.jpg)
@@ -30,6 +31,8 @@ from pathlib import Path
 
 from google import genai
 from google.genai import types
+
+from models import SlideSkillState
 
 
 REPO_ROOT = Path(__file__).parent.parent
@@ -66,14 +69,19 @@ class SlideGenerator:
         self.reference_dir = reference_dir
         self._client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 
-    def generate(self, session_id: str, session_dir: Path) -> Path:
+    def generate(
+        self,
+        session_id: str,
+        session_dir: Path,
+        state: SlideSkillState | None = None,
+    ) -> Path:
         """
         Run the full pipeline for one optimization step.
 
         Args:
             session_id: Used only for logging/naming.
-            session_dir: Isolated directory containing the session's
-                         DESIGN_RULES.md and EXAMPLES.md.
+            session_dir: Isolated directory containing the session's skill files.
+            state: Session state with js_templates, constraints, code_patches.
 
         Returns:
             Absolute path to the generated slide JPG (slide-1.jpg).
@@ -90,11 +98,18 @@ class SlideGenerator:
         jpg_stem = out_dir / "slide"
         jpg_path = out_dir / "slide-1.jpg"
 
-        # Stage 1+2: LLM generates JS, Node executes it.
+        # Stage 1+2: LLM generates JS, patches applied, Node executes it.
         # Retry up to 3 times feeding Node errors back to the LLM.
         node_error: str | None = None
         for attempt in range(1, 4):
-            js_code = self._call_generator_llm(session_dir, node_error=node_error)
+            js_code = self._call_generator_llm(
+                session_dir, state=state, node_error=node_error,
+            )
+
+            # Apply code patches from the session state.
+            if state and state.code_patches:
+                js_code = self._apply_patches(js_code, state.code_patches)
+
             js_path.write_text(js_code, encoding="utf-8")
             try:
                 self._run(["node", str(js_path)], cwd=out_dir, stage="node generate.js")
@@ -158,17 +173,27 @@ class SlideGenerator:
     # Private helpers
     # ------------------------------------------------------------------
 
-    def _call_generator_llm(self, session_dir: Path, node_error: str | None = None) -> str:
+    def _call_generator_llm(
+        self,
+        session_dir: Path,
+        state: SlideSkillState | None = None,
+        node_error: str | None = None,
+    ) -> str:
         """
         Call the generator LLM with skill files + task prompt as context.
+
+        Reads skill files from the session directory first (so agent edits
+        take effect), falling back to the repo's pptx/ dir for any files
+        not present in the session.
 
         Returns the raw JavaScript code string (without markdown fences).
         """
         design_rules = (session_dir / "DESIGN_RULES.md").read_text(encoding="utf-8")
         examples = (session_dir / "EXAMPLES.md").read_text(encoding="utf-8")
 
-        # Load the generic pptx tooling files as executor context.
-        pptx_skill = self._read_pptx_skill()
+        # Load pptx tooling from session dir (edited copies) with fallback
+        # to repo originals.
+        pptx_skill = self._read_pptx_skill(session_dir)
 
         system_prompt = textwrap.dedent("""\
             You are an expert pptxgenjs developer. You will write a complete,
@@ -194,9 +219,30 @@ class SlideGenerator:
 
             ## Task
             {self.task_prompt}
-
-            Write the complete pptxgenjs JavaScript file now.
         """)
+
+        # Inject hard constraints if any.
+        if state and state.constraints:
+            constraints_text = "\n".join(f"- {c}" for c in state.constraints)
+            user_message += textwrap.dedent(f"""
+            ## Hard Constraints
+            You MUST follow these constraints exactly:
+            {constraints_text}
+            """)
+
+        # Inject JS templates if any.
+        if state and state.js_templates:
+            templates_text = ""
+            for name, code in state.js_templates.items():
+                templates_text += f"\n### {name}\n```javascript\n{code}\n```\n"
+            user_message += textwrap.dedent(f"""
+            ## Required Code Blocks
+            You MUST include the following code blocks verbatim in your script.
+            Do NOT modify them — copy them exactly as shown:
+            {templates_text}
+            """)
+
+        user_message += "\nWrite the complete pptxgenjs JavaScript file now.\n"
 
         if node_error:
             user_message += textwrap.dedent(f"""
@@ -257,14 +303,29 @@ class SlideGenerator:
 
         return code
 
-    def _read_pptx_skill(self) -> str:
-        """Concatenate the generic pptx skill files for LLM context."""
+    def _read_pptx_skill(self, session_dir: Path) -> str:
+        """
+        Concatenate the pptx skill files for LLM context.
+
+        Reads from session_dir first (agent-edited copies), falling back
+        to the repo's pptx/ dir for files not yet copied or edited.
+        """
         parts = []
         for fname in ("SKILL.md", "editing.md", "pptxgenjs.md"):
-            p = self.pptx_skill_dir / fname
-            if p.exists():
-                parts.append(f"### {fname}\n{p.read_text(encoding='utf-8')}")
+            session_copy = session_dir / fname
+            repo_copy = self.pptx_skill_dir / fname
+            if session_copy.exists():
+                parts.append(f"### {fname}\n{session_copy.read_text(encoding='utf-8')}")
+            elif repo_copy.exists():
+                parts.append(f"### {fname}\n{repo_copy.read_text(encoding='utf-8')}")
         return "\n\n".join(parts)
+
+    @staticmethod
+    def _apply_patches(code: str, patches: list[dict[str, str]]) -> str:
+        """Apply regex find/replace patches to generated JS code."""
+        for patch in patches:
+            code = re.sub(patch["pattern"], patch["replacement"], code)
+        return code
 
     @staticmethod
     def _run(cmd: list[str], cwd: Path, stage: str) -> None:

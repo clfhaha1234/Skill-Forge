@@ -2,14 +2,19 @@
 Pydantic data models for the Slide Skill OpenEnv environment.
 
 Action space:
-    SlideSkillAction is a discriminated union of two action types:
+    SlideSkillAction is a discriminated union of action types:
+
+    File-level actions (modify skill markdown files):
     - EditSectionAction: Replace a named section's body in one skill file.
     - ReplaceFileAction: Replace the entire content of one skill file.
 
-    EditSectionAction is appropriate when the agent wants surgical edits
-    (e.g., update only the typography section). ReplaceFileAction is used
-    when the optimizer rewrites the file wholesale, which is what the
-    historical optimizer LLM actually does.
+    Structured actions (higher-level operations):
+    - AppendExampleAction: Append a scored example entry to EXAMPLES.md.
+    - EditJsTemplateAction: Define a reusable JS code block injected into
+      the generator prompt as a mandatory snippet.
+    - SetConstraintAction: Add or remove a hard constraint for the generator.
+    - PatchCodeAction: Add a regex find/replace rule applied to generated JS
+      after LLM output but before Node.js execution.
 
 Observation space:
     SlideSkillObservation contains the full evaluator output including all
@@ -27,8 +32,14 @@ from pydantic import BaseModel, Field
 # Actions
 # ---------------------------------------------------------------------------
 
-SkillFile = Literal["DESIGN_RULES.md", "EXAMPLES.md"]
-"""The two skill files the optimizer is allowed to modify."""
+SkillFile = Literal[
+    "DESIGN_RULES.md",
+    "EXAMPLES.md",
+    "SKILL.md",
+    "editing.md",
+    "pptxgenjs.md",
+]
+"""Skill files the optimizer is allowed to modify."""
 
 
 class EditSectionAction(BaseModel):
@@ -79,9 +90,113 @@ class ReplaceFileAction(BaseModel):
     )
 
 
+class AppendExampleAction(BaseModel):
+    """
+    Append a scored example entry to EXAMPLES.md.
+
+    Builds a memory of what the evaluator rewards, giving the generator
+    better few-shot context over time. The entry is formatted as a markdown
+    section with score, verdict, and description.
+    """
+
+    action_type: Literal["append_example"] = "append_example"
+    description: str = Field(
+        ...,
+        description="What this example demonstrates (e.g. 'White bg with navy table headers').",
+    )
+    score: int = Field(
+        ..., ge=0, le=100,
+        description="The score this approach achieved (0-100).",
+    )
+    verdict: str = Field(
+        ...,
+        description="Evaluator's one-line verdict for this example.",
+    )
+
+
+class EditJsTemplateAction(BaseModel):
+    """
+    Define or update a reusable JS code block injected into the generator prompt.
+
+    Templates are stored per-session and injected as a "## Required Code Blocks"
+    section. The generator LLM is instructed to use the exact code for the
+    named block. Set js_code to empty string to delete a template.
+
+    Example:
+        action = EditJsTemplateAction(
+            block_name="footer",
+            js_code="slide.addText('McKinsey & Company', {x: 8.5, y: 5.2, ...});"
+        )
+    """
+
+    action_type: Literal["edit_js_template"] = "edit_js_template"
+    block_name: str = Field(
+        ...,
+        description="Name for this code block (e.g. 'footer', 'table_style', 'title_section').",
+    )
+    js_code: str = Field(
+        ...,
+        description="JavaScript code snippet. Empty string removes the template.",
+    )
+
+
+class SetConstraintAction(BaseModel):
+    """
+    Add or remove a hard constraint for the generator LLM.
+
+    Constraints are injected into the generator prompt as a "## Hard Constraints"
+    section. Each constraint is a single directive like "NEVER use require('react')"
+    or "ALWAYS use a white background".
+    """
+
+    action_type: Literal["set_constraint"] = "set_constraint"
+    constraint: str = Field(
+        ...,
+        description="The constraint text (e.g. 'NEVER use colored backgrounds for data slides').",
+    )
+    active: bool = Field(
+        True,
+        description="True to add/keep the constraint, False to remove it.",
+    )
+
+
+class PatchCodeAction(BaseModel):
+    """
+    Add a regex find/replace rule applied to generated JS after LLM output
+    but before Node.js execution.
+
+    Patches are applied in insertion order. Useful for mechanical fixes like
+    color corrections, font swaps, or removing problematic API calls.
+    Set replacement to None to remove a patch by its description.
+    """
+
+    action_type: Literal["patch_code"] = "patch_code"
+    pattern: str = Field(
+        ...,
+        description="Regex pattern to search for in the generated JS code.",
+    )
+    replacement: str = Field(
+        ...,
+        description="Replacement string (supports regex backreferences like \\1).",
+    )
+    description: str = Field(
+        ...,
+        description="Human-readable description of what this patch does.",
+    )
+    active: bool = Field(
+        True,
+        description="True to add/keep the patch, False to remove it (matched by description).",
+    )
+
+
 # Discriminated union — action_type is the discriminator field.
 SlideSkillAction = Annotated[
-    EditSectionAction | ReplaceFileAction,
+    EditSectionAction
+    | ReplaceFileAction
+    | AppendExampleAction
+    | EditJsTemplateAction
+    | SetConstraintAction
+    | PatchCodeAction,
     Field(discriminator="action_type"),
 ]
 
@@ -164,6 +279,18 @@ class SlideSkillObservation(BaseModel):
         ...,
         description="Current EXAMPLES.md content (after action was applied).",
     )
+    js_templates: dict[str, str] = Field(
+        default_factory=dict,
+        description="Active JS templates (block_name → js_code).",
+    )
+    constraints: list[str] = Field(
+        default_factory=list,
+        description="Active hard constraints for the generator.",
+    )
+    code_patches: list[dict[str, str]] = Field(
+        default_factory=list,
+        description="Active code patches (list of {pattern, replacement, description}).",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -181,7 +308,19 @@ class SlideSkillState(BaseModel):
         ...,
         description=(
             "Absolute path to the isolated session directory under /tmp/. "
-            "Contains copies of DESIGN_RULES.md and EXAMPLES.md that this "
-            "session is free to modify without affecting other sessions."
+            "Contains copies of skill files that this session is free to "
+            "modify without affecting other sessions."
         ),
+    )
+    js_templates: dict[str, str] = Field(
+        default_factory=dict,
+        description="Named JS code blocks injected into generator prompt.",
+    )
+    constraints: list[str] = Field(
+        default_factory=list,
+        description="Hard constraints injected into generator prompt.",
+    )
+    code_patches: list[dict[str, str]] = Field(
+        default_factory=list,
+        description="Regex patches applied to generated JS post-LLM.",
     )
