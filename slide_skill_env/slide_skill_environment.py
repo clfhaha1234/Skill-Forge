@@ -103,7 +103,7 @@ class SlideSkillEnvironment(Environment[SkillAction, SkillObservation, SkillStat
         skill_files = self._skill_manager.snapshot()
         pptx_path = slides_dir / "slide_step_0.pptx"
         generate_slide(self._task_prompt, skill_files, pptx_path)
-        jpg_path = pptx_to_jpg(pptx_path, slides_dir)
+        jpg_path = pptx_to_jpg(pptx_path, slides_dir, jpg_prefix="slide_step_0")
         slide_bytes = jpg_path.read_bytes()
 
         evaluation = evaluate_slide(slide_bytes, self._reference_images)
@@ -139,11 +139,10 @@ class SlideSkillEnvironment(Environment[SkillAction, SkillObservation, SkillStat
         step_num = self._state.step_count
         slides_dir = self._episode_dir / "slides"
 
-        # 1. OPTIMIZE
+        # 1. OPTIMIZE (uses feedback only, no reference images)
         optimize_skill(
             skill_manager=self._skill_manager,
             evaluation=self._last_evaluation,
-            reference_images=self._reference_images,
             hint=action.hint if isinstance(action, SkillAction) else None,
         )
 
@@ -153,7 +152,7 @@ class SlideSkillEnvironment(Environment[SkillAction, SkillObservation, SkillStat
         generate_slide(self._task_prompt, skill_files, pptx_path)
 
         # 3. CONVERT
-        jpg_path = pptx_to_jpg(pptx_path, slides_dir)
+        jpg_path = pptx_to_jpg(pptx_path, slides_dir, jpg_prefix=f"slide_step_{step_num}")
         slide_bytes = jpg_path.read_bytes()
 
         # 4. EVALUATE

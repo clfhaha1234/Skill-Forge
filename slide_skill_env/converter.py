@@ -4,12 +4,13 @@ import subprocess
 from pathlib import Path
 
 
-def pptx_to_jpg(pptx_path: Path, output_dir: Path) -> Path:
+def pptx_to_jpg(pptx_path: Path, output_dir: Path, jpg_prefix: str = "slide") -> Path:
     """Convert a .pptx file to a JPEG image of the first slide.
 
     Args:
         pptx_path: Path to the .pptx file.
         output_dir: Directory to write intermediate and final files.
+        jpg_prefix: Prefix for pdftoppm output filenames (default "slide").
 
     Returns:
         Path to the rendered JPEG image.
@@ -39,14 +40,14 @@ def pptx_to_jpg(pptx_path: Path, output_dir: Path) -> Path:
         )
 
     # Step 2: pdf → jpg via pdftoppm (first page only)
-    jpg_prefix = output_dir / "slide"
+    jpg_prefix_path = output_dir / jpg_prefix
     result = subprocess.run(
         [
             "pdftoppm",
             "-jpeg", "-r", "150",
             "-f", "1", "-l", "1",
             str(pdf_path),
-            str(jpg_prefix),
+            str(jpg_prefix_path),
         ],
         capture_output=True,
         text=True,
@@ -55,8 +56,8 @@ def pptx_to_jpg(pptx_path: Path, output_dir: Path) -> Path:
     if result.returncode != 0:
         raise RuntimeError(f"pdftoppm conversion failed: {result.stderr}")
 
-    # pdftoppm outputs slide-1.jpg or slide-01.jpg
-    candidates = list(output_dir.glob("slide-*.jpg"))
+    # pdftoppm outputs <prefix>-1.jpg or <prefix>-01.jpg
+    candidates = sorted(output_dir.glob(f"{jpg_prefix}-*.jpg"))
     if not candidates:
         raise RuntimeError("No JPEG output found from pdftoppm")
     return candidates[0]

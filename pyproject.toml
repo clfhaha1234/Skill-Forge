@@ -15,6 +15,7 @@ dependencies = [
     "pydantic>=2.0",
     "python-dotenv",
     "loguru>=0.7.0",
+    "websockets",
 ]
 
 [tool.setuptools.packages.find]

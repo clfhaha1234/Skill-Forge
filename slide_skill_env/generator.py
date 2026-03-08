@@ -29,9 +29,13 @@ def generate_slide(
     key = api_key or os.environ["ANTHROPIC_API_KEY"]
     client = anthropic.Anthropic(api_key=key)
 
-    # Build message with skill files as context
+    # Build message with skill files as context (cap total size at 4000 chars)
     skill_context = ""
+    total_len = sum(len(c) for c in skill_files.values())
     for filename, content in skill_files.items():
+        if total_len > 4000:
+            max_chars = int(4000 * len(content) / total_len)
+            content = content[:max_chars] + "\n... (truncated)"
         skill_context += f"\n### {filename}\n```\n{content}\n```\n"
 
     message_content = (
@@ -42,7 +46,7 @@ def generate_slide(
 
     response = client.beta.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=16384,
+        max_tokens=8192,
         betas=["code-execution-2025-08-25", "skills-2025-10-02"],
         container={
             "skills": [

@@ -1,6 +1,5 @@
 """Agentic optimizer using Claude Opus 4.6 with file tools."""
 
-import base64
 import os
 
 import anthropic
@@ -14,7 +13,7 @@ You have tools to read, write, list, and delete files in the skill folder.
 The skill folder contains markdown files (like DESIGN_RULES.md, EXAMPLES.md)
 that guide a slide generator.
 
-Based on the evaluation feedback and reference images, decide what changes
+Based on the evaluation feedback, decide what changes
 to make. You can:
 - Edit existing files to fix issues identified in the feedback
 - Add new files (e.g., COLOR_RULES.md, LAYOUT_PATTERNS.md) if the skill
@@ -74,16 +73,18 @@ OPTIMIZER_TOOLS = [
 def optimize_skill(
     skill_manager: SkillManager,
     evaluation: dict,
-    reference_images: list[bytes],
     hint: str | None = None,
     api_key: str | None = None,
 ) -> None:
     """Run the optimizer agent to improve skill files in-place.
 
+    The optimizer works from evaluation feedback only (scores, strengths,
+    weaknesses). It does NOT see reference images — those are only used
+    by the evaluator (Gemini) as ground truth.
+
     Args:
         skill_manager: SkillManager pointing to the working skill folder.
         evaluation: Previous evaluation results (scores, strengths, weaknesses).
-        reference_images: User-provided reference images as bytes.
         hint: Optional guidance from the client.
         api_key: Anthropic API key.
     """
@@ -96,20 +97,6 @@ def optimize_skill(
         files_str += f"\n### {name}\n```\n{content}\n```\n"
 
     content_parts = []
-
-    content_parts.append({
-        "type": "text",
-        "text": "## Reference Images (target style)\nStudy these carefully:",
-    })
-    for i, img_bytes in enumerate(reference_images):
-        content_parts.append({
-            "type": "image",
-            "source": {
-                "type": "base64",
-                "media_type": "image/jpeg",
-                "data": base64.standard_b64encode(img_bytes).decode(),
-            },
-        })
 
     feedback_text = (
         f"\n## Previous Evaluation\n"
