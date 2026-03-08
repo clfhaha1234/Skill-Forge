@@ -6,13 +6,9 @@ Concurrency model:
     SUPPORTS_CONCURRENT_SESSIONS = True
 
     Each session gets an isolated working directory at /tmp/slide_skill_{session_id}/.
-    Skill files (DESIGN_RULES.md, EXAMPLES.md) are copied there on reset() and
-    modified in place during the session. The shared repo files are never modified.
-    This means multiple sessions can run simultaneously without file conflicts.
-
-    The only shared resource is the Anthropic API key, which is rate-limited
-    per-account. For HuggingFace Spaces, running 2-3 concurrent sessions is
-    realistic before hitting rate limits.
+    All skill files (DESIGN_RULES.md, EXAMPLES.md, SKILL.md, editing.md,
+    pptxgenjs.md) are copied there on reset() and modified in place during
+    the session. The shared repo files are never modified.
 
 Episode timing:
     Each step involves two LLM calls (generator + evaluator) plus Node.js and
@@ -21,9 +17,7 @@ Episode timing:
 
 Reward function:
     reward = clip(total_score - prev_total_score, -30, +30) / 100
-    Capping at +/-30 points (+/-0.3 reward) dampens LLM evaluation noise. A score
-    can fluctuate +/-5-10 points between identical slides due to evaluator variance,
-    so capping prevents large undeserved penalties or bonuses.
+    Capping at +/-30 points (+/-0.3 reward) dampens LLM evaluation noise.
 """
 
 from __future__ import annotations
@@ -48,6 +42,7 @@ from evaluator_adapter import EvaluatorAdapter
 # Paths relative to repo root — adjust if the package moves.
 REPO_ROOT = Path(__file__).parent.parent
 BASELINE_DIR = REPO_ROOT / "skill_files_baseline"
+PPTX_SKILL_DIR = REPO_ROOT / "pptx"
 TASK_PROMPT_PATH = REPO_ROOT / "output" / "TASK_PROMPT.md"
 REFERENCE_DIR = REPO_ROOT / "output" / "reference"
 
@@ -56,6 +51,11 @@ REWARD_CLIP_POINTS = 30  # clip score delta to +/-30 before normalizing
 REWARD_SCALE = 100.0  # divide clipped delta by this to get [-0.3, +0.3]
 
 MAX_STEPS = int(os.environ.get("SLIDE_SKILL_MAX_STEPS", "7"))
+
+# Baseline skill files (DESIGN_RULES.md + EXAMPLES.md) and generic pptx
+# tooling files that get copied into each session.
+BASELINE_FILES = ("DESIGN_RULES.md", "EXAMPLES.md")
+PPTX_SKILL_FILES = ("SKILL.md", "editing.md", "pptxgenjs.md")
 
 
 class SlideSkillEnvironment:
@@ -67,7 +67,7 @@ class SlideSkillEnvironment:
         self._sessions: dict[str, SlideSkillState] = {}
         self._generator = SlideGenerator(
             task_prompt_path=TASK_PROMPT_PATH,
-            pptx_skill_dir=REPO_ROOT / "pptx",
+            pptx_skill_dir=PPTX_SKILL_DIR,
             reference_dir=REFERENCE_DIR,
         )
         self._evaluator = EvaluatorAdapter(reference_dir=REFERENCE_DIR)
@@ -80,18 +80,19 @@ class SlideSkillEnvironment:
         """
         Initialize or reinitialize a session.
 
-        Creates an isolated working directory under /tmp/ and copies the
-        baseline skill files into it. Returns the session_id.
+        Creates an isolated working directory under /tmp/ and copies both
+        the baseline skill files and the generic pptx tooling files into it.
+        Returns the session_id.
         """
         session_id = session_id or str(uuid.uuid4())
 
-        session_dir = Path(f"/tmp/slide_skill_{session_id}")
+        session_dir = REPO_ROOT / "tmp" / f"slide_skill_{session_id}"
         if session_dir.exists():
             shutil.rmtree(session_dir)
         session_dir.mkdir(parents=True)
 
-        # Copy baseline skill files into the session directory.
-        for fname in ("DESIGN_RULES.md", "EXAMPLES.md"):
+        # Copy baseline skill files (DESIGN_RULES.md, EXAMPLES.md).
+        for fname in BASELINE_FILES:
             src = BASELINE_DIR / fname
             if not src.exists():
                 raise FileNotFoundError(
@@ -99,6 +100,12 @@ class SlideSkillEnvironment:
                     "Commit skill_files_baseline/ to the repo."
                 )
             shutil.copy2(src, session_dir / fname)
+
+        # Copy generic pptx skill/tooling files so the agent can edit them.
+        for fname in PPTX_SKILL_FILES:
+            src = PPTX_SKILL_DIR / fname
+            if src.exists():
+                shutil.copy2(src, session_dir / fname)
 
         self._sessions[session_id] = SlideSkillState(
             session_id=session_id,
@@ -115,7 +122,7 @@ class SlideSkillEnvironment:
 
         Args:
             session_id: Must be a live session (call reset() first).
-            action: Either EditSectionAction or ReplaceFileAction.
+            action: Any SlideSkillAction variant.
 
         Returns:
             SlideSkillObservation with scores, feedback, reward, and file contents.
@@ -127,14 +134,17 @@ class SlideSkillEnvironment:
         state = self._sessions[session_id]
         session_dir = Path(state.session_dir)
 
-        # 1. Apply the action to the session's skill files.
-        manager = SkillManager(session_dir)
+        # 1. Apply the action to the session's skill files / state.
+        manager = SkillManager(session_dir, state)
         manager.apply(action)
 
         # 2. Run the full generation pipeline.
+        #    Pass state so the generator can inject templates/constraints
+        #    and apply code patches.
         jpg_path = self._generator.generate(
             session_id=session_id,
             session_dir=session_dir,
+            state=state,
         )
 
         # 3. Evaluate the generated slide.
@@ -168,6 +178,9 @@ class SlideSkillEnvironment:
             jpg_path=str(jpg_path),
             design_rules_content=design_rules,
             examples_content=examples,
+            js_templates=dict(state.js_templates),
+            constraints=list(state.constraints),
+            code_patches=list(state.code_patches),
         )
 
     def close(self, session_id: str) -> None:
