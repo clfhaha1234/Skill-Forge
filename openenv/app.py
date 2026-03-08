@@ -23,9 +23,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import traceback
-import uuid
 from contextlib import asynccontextmanager
-from pathlib import Path
+from pathlib import Path as FilePath
 
 from dotenv import load_dotenv
 
@@ -33,7 +32,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Load .env from the repo root (one level up from openenv/)
-load_dotenv(Path(__file__).parent.parent / ".env")
+load_dotenv(FilePath(__file__).parent.parent / ".env")
 from typing import Annotated, Any
 
 import uvicorn
@@ -42,7 +41,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
 from models import SlideSkillAction, SlideSkillObservation
-from slide_skill_environment import SlideSkillEnvironment, SESSION_ROOT
+from slide_skill_environment import SlideSkillEnvironment
 
 
 # Single shared environment instance. Sessions are isolated at the file
@@ -50,7 +49,7 @@ from slide_skill_environment import SlideSkillEnvironment, SESSION_ROOT
 _env: SlideSkillEnvironment | None = None
 
 # In-memory store for UI-generated slides: session_id → {jpg, pptx}
-_ui_slides: dict[str, dict[str, Path]] = {}
+_ui_slides: dict[str, dict[str, FilePath]] = {}
 
 # Semaphore: only one generation at a time (LibreOffice is not concurrent-safe)
 _generation_lock = asyncio.Semaphore(1)
@@ -368,7 +367,7 @@ def _run_generation(prompt: str) -> tuple[int, str, str]:
     assert _env is not None
     session_id = _env.reset()
     state = _env._sessions[session_id]
-    session_dir = Path(state.session_dir)
+    session_dir = FilePath(state.session_dir)
 
     jpg_path = _env._generator.generate(
         session_id=session_id,

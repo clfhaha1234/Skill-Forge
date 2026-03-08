@@ -66,7 +66,7 @@ class SlideGenerator:
         self.task_prompt = task_prompt_path.read_text(encoding="utf-8")
         self.pptx_skill_dir = pptx_skill_dir
         self.reference_dir = reference_dir
-        self._client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+        self._client: anthropic.Anthropic | None = None  # lazy-init on first use
 
     def generate(
         self,
@@ -253,6 +253,9 @@ class SlideGenerator:
 
             {node_error}
         """)
+
+        if self._client is None:
+            self._client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
         response = self._client.messages.create(
             model=GENERATOR_MODEL,

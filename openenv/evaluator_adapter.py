@@ -164,7 +164,7 @@ class EvaluatorAdapter:
                            proceeds using rubric-only scoring (no reference comparison).
         """
         self.reference_dir = reference_dir
-        self._client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+        self._client: genai.Client | None = None  # lazy-init on first use
 
         # Check which reference images are available (missing ones are silently skipped).
         self._available_refs = [
@@ -225,6 +225,9 @@ class EvaluatorAdapter:
             "\nNow score this candidate slide against the McKinsey reference "
             "using the rubric. Return ONLY the JSON object."
         )
+
+        if self._client is None:
+            self._client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 
         response = self._client.models.generate_content(
             model=EVALUATOR_MODEL,
