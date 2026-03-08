@@ -73,6 +73,7 @@ class SlideGenerator:
         session_id: str,
         session_dir: Path,
         state: SlideSkillState | None = None,
+        task_prompt_override: str | None = None,
     ) -> Path:
         """
         Run the full pipeline for one optimization step.
@@ -103,6 +104,7 @@ class SlideGenerator:
         for attempt in range(1, 4):
             js_code = self._call_generator_llm(
                 session_dir, state=state, node_error=node_error,
+                task_prompt_override=task_prompt_override,
             )
 
             # Apply code patches from the session state.
@@ -177,6 +179,7 @@ class SlideGenerator:
         session_dir: Path,
         state: SlideSkillState | None = None,
         node_error: str | None = None,
+        task_prompt_override: str | None = None,
     ) -> str:
         """
         Call Claude Sonnet 4.6 with skill files + task prompt as context.
@@ -204,6 +207,8 @@ class SlideGenerator:
             - Use the pptxgenjs API reference below for correct method calls.
         """)
 
+        task = task_prompt_override or self.task_prompt
+
         user_message = textwrap.dedent(f"""\
             ## pptxgenjs API Reference
             {pptx_skill}
@@ -215,7 +220,7 @@ class SlideGenerator:
             {examples}
 
             ## Task
-            {self.task_prompt}
+            {task}
         """)
 
         if state and state.constraints:
