@@ -8,6 +8,7 @@ __pycache__/
 .ruff_cache/
 dist/
 *.egg-info/
+.venv/
 
 output/*.jpg
 output/*.png

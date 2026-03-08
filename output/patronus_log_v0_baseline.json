@@ -1,0 +1,45 @@
+{
+  "description": "Patronus evaluation of v0 BASELINE slide (before RL optimization)",
+  "slide": "slide_v0-1.jpg",
+  "timestamp": "2026-03-08T16:16:26Z",
+  "evaluator": "judge-mm-image-large-2025-01-27",
+  "criteria": "mckinsey-slide-eval:1",
+  "result": "FAIL",
+  "score_raw": 0.0,
+  "image_description": "Dark navy blue background. Title 'Hydrogen Production Methods Comparison' in large bold teal-green font. Table with teal-green headers and white text. Source note at bottom left, 'McKinsey & Company' at bottom right. No page number.",
+  "criteria_evaluation": {
+    "1_white_background": {
+      "pass": false,
+      "explanation": "The pass criteria explicitly states the slide should have a white background, but the provided image has a dark navy background."
+    },
+    "2_restrained_color_palette": {
+      "pass": true,
+      "explanation": "The color palette is restrained, using navy, teal-green, and white, and does not have 'rainbow effects'."
+    },
+    "3_insight_driven_title": {
+      "pass": false,
+      "explanation": "The title 'Hydrogen Production Methods Comparison' is a descriptive topic label, not an insight-driven conclusion or 'so-what' statement."
+    },
+    "4_structured_data_table": {
+      "pass": false,
+      "explanation": "The pass criteria requires 'navy header borders'. The table has headers with a solid teal-green background fill, which is a different style."
+    },
+    "5_proper_footer": {
+      "pass": false,
+      "explanation": "The footer is missing the required page number."
+    },
+    "6_clean_typography": {
+      "pass": true,
+      "explanation": "The slide demonstrates a clean typography hierarchy with a large bold title and smaller body text."
+    },
+    "7_thin_divider_line": {
+      "pass": false,
+      "explanation": "There is no thin divider line below the title area as required."
+    },
+    "8_professional_polish": {
+      "pass": true,
+      "explanation": "The slide has a professional and clean design quality consistent with consulting outputs."
+    }
+  },
+  "summary": "5 of 8 criteria FAILED: white background, insight title, table headers, footer page number, divider line. The baseline slide uses a dark navy background with teal accent colors — fundamentally wrong for McKinsey style."
+}
